@@ -1,14 +1,15 @@
-import 'react-native-gesture-handler';
-import { NavigationContainer } from '@react-navigation/native';
+import "react-native-gesture-handler";
+import { NavigationContainer } from "@react-navigation/native";
+import TabNav from "./Navigation/TabNav";
 
-import AuthStackNav from './Navigation/loginStackNav';
-
+import { ThemeProvider } from "./hooks/ThemeContext";
 
 export default function App() {
   return (
-    <NavigationContainer>
-      <AuthStackNav/>
-      
-    </NavigationContainer>
+    <ThemeProvider>
+      <NavigationContainer>
+        <TabNav />
+      </NavigationContainer>
+    </ThemeProvider>
   );
 }
