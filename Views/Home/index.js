@@ -1,99 +1,98 @@
-import React, { useEffect, useState } from "react";
-import { Text, View, FlatList, TouchableOpacity, Button } from "react-native";
-import * as FileSystem from "expo-file-system";
+import React, { useEffect, useState, useRef } from "react";
+import {
+  Text,
+  View,
+  FlatList,
+  Button,
+  SafeAreaView,
+  StyleSheet,
+  Image,
+  TouchableOpacity,
+} from "react-native";
 import { Audio } from "expo-av";
+import styles from "./styles";
+
+const flaskServerURL = "http://192.168.0.177:5000/";
 
 const App = () => {
-  const [mp3Files, setMp3Files] = useState([]);
-  const [sound, setSound] = useState();
+  const [mediaFiles, setMediaFiles] = useState([]);
+  const [error, setError] = useState(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const soundRef = useRef(null);
 
   useEffect(() => {
-    const setupDirectory = async () => {
-      try {
-        const directory = FileSystem.documentDirectory + "audio/";
-        const directoryInfo = await FileSystem.getInfoAsync(directory);
-
-        if (!directoryInfo.exists) {
-          await FileSystem.makeDirectoryAsync(directory, {
-            intermediates: true,
-          });
-        }
-
-        // Simulate adding a sample MP3 file for demonstration purposes
-        const sampleMp3Uri = FileSystem.documentDirectory + "audio/sample.mp3";
-        const sampleMp3Exists = await FileSystem.getInfoAsync(sampleMp3Uri);
-
-        if (!sampleMp3Exists.exists) {
-          // Copy a sample MP3 file from assets to the directory
-          const { uri: assetUri } = await FileSystem.downloadAsync(
-            "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3", // Example MP3 URL
-            sampleMp3Uri
-          );
-          console.log("Sample MP3 file added at:", assetUri);
-        }
-
-        const files = await FileSystem.readDirectoryAsync(directory);
-        const mp3Files = files.filter((file) => file.endsWith(".mp3"));
-        setMp3Files(mp3Files);
-      } catch (error) {
-        console.error("Error setting up directory:", error);
-      }
-    };
-
-    setupDirectory();
-
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-    };
+    fetchMediaFiles();
   }, []);
 
-  const playSound = async (fileUri) => {
+  const fetchMediaFiles = async () => {
     try {
-      console.log("Loading Sound:", fileUri);
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        { uri: fileUri },
-        { shouldPlay: true } // Automatically play the sound once it's loaded
-      );
-      setSound(newSound);
-      console.log("asd");
-      newSound.setOnPlaybackStatusUpdate((status) => {
-        if (status.isLoaded) {
-          if (status.didJustFinish) {
-            console.log("Playback finished");
-            newSound.unloadAsync();
-          }
-        } else if (status.error) {
-          console.log("Playback error:", status.error);
-        }
-      });
-
-      await newSound.playAsync();
+      const response = await fetch(`${flaskServerURL}/media_files`);
+      const data = await response.json();
+      setMediaFiles(data);
     } catch (error) {
-      console.log("Error playing sound:", error);
+      setError("Error fetching media files: " + error.message);
     }
   };
 
-  const renderMp3Item = ({ item }) => {
-    const fileUri = FileSystem.documentDirectory + "audio/" + item;
-    return (
-      <View style={{ margin: 10 }}>
-        <Text>{item}</Text>
-        <Button title="Play" onPress={() => playSound(fileUri)} />
-      </View>
-    );
+  const playMP3 = async (path) => {
+    try {
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
+      }
+      const { sound } = await Audio.Sound.createAsync({
+        uri: `${flaskServerURL}/${path}`,
+      });
+      soundRef.current = sound;
+      await sound.playAsync();
+      setIsPlaying(true);
+      sound.setOnPlaybackStatusUpdate((status) => {
+        if (status.didJustFinish) {
+          setIsPlaying(false);
+        }
+      });
+    } catch (error) {
+      setError("Error playing MP3 file: " + error.message);
+    }
+  };
+
+  const stopMP3 = async () => {
+    try {
+      if (soundRef.current) {
+        await soundRef.current.stopAsync();
+        await soundRef.current.unloadAsync();
+        setIsPlaying(false);
+      }
+    } catch (error) {
+      setError("Error stopping MP3 file: " + error.message);
+    }
   };
 
   return (
-    <View style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
-      <Text>List of MP3 Files:</Text>
+    <SafeAreaView style={styles.container}>
+      {error && <Text style={styles.errorText}>{error}</Text>}
       <FlatList
-        data={mp3Files}
-        renderItem={renderMp3Item}
-        keyExtractor={(item, index) => index.toString()}
+        data={mediaFiles}
+        keyExtractor={(item) => item.name}
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            onPress={() => playMP3(item.path)}
+            style={styles.itemContainer}
+          >
+            {item.image && (
+              <Image
+                source={{ uri: `${flaskServerURL}/${item.image}` }}
+                style={styles.image}
+              />
+            )}
+            <View style={styles.textContainer}>
+              <Text style={styles.title}>{item.title}</Text>
+              <Text style={styles.name}>{item.name}</Text>
+            </View>
+          </TouchableOpacity>
+        )}
       />
-    </View>
+      {isPlaying && <Button title="Stop" onPress={stopMP3} />}
+    </SafeAreaView>
   );
 };
 
