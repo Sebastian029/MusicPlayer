@@ -37,7 +37,7 @@ const App = () => {
     }
   };
 
-  const playMP3 = async (path) => {
+  const playMP3 = async (path, name) => {
     try {
       if (soundRef.current) {
         await soundRef.current.unloadAsync();
@@ -53,7 +53,7 @@ const App = () => {
           setIsPlaying(false);
         }
       });
-      const waveforms = await getWaveForms(path, flaskServerURL);
+      const waveforms = await getWaveForms(flaskServerURL, name);
       setWave(waveforms);
     } catch (error) {
       setError("Error playing MP3 file: " + error.message);
@@ -80,7 +80,7 @@ const App = () => {
         keyExtractor={(item) => item.name}
         renderItem={({ item }) => (
           <TouchableOpacity
-            onPress={() => playMP3(item.path)}
+            onPress={() => playMP3(item.path, item.name)}
             style={styles.itemContainer}
           >
             {item.image && (

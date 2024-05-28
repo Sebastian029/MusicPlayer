@@ -1,11 +1,23 @@
-export async function getWaveForms(path, flaskServerURL, size = 150) {
+export async function getWaveForms(flaskServerURL, path) {
   const waveforms = [];
-  const url = `${flaskServerURL}/${path}`;
-  console.log("getweaveformsss");
+  const url = `${flaskServerURL}/get_waveform/${path}`;
 
-  for (let i = 0; i < size; i++) {
-    waveforms.push(Math.max(10, Math.floor(Math.random() * 100)));
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error("Failed to fetch data");
+    }
+
+    const responseData = await response.text();
+
+    const parsedData = JSON.parse(responseData);
+
+    for (let i = 0; i < parsedData.length; i++) {
+      waveforms.push(parsedData[i]);
+    }
+    return waveforms;
+  } catch (error) {
+    console.error("Error fetching waveform data:", error);
+    return waveforms; // Return empty array or partial data in case of error
   }
-
-  return waveforms;
 }
