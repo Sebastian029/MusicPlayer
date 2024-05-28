@@ -11,13 +11,16 @@ import {
 } from "react-native";
 import { Audio } from "expo-av";
 import styles from "./styles";
+import WaveForms from "../../components/Waveforms/Waveforms";
+import { getWaveForms } from "../../components/Waveforms/utils";
 
-const flaskServerURL = "http://192.168.0.177:5000/";
+const flaskServerURL = "http://172.20.10.3:5000";
 
 const App = () => {
   const [mediaFiles, setMediaFiles] = useState([]);
   const [error, setError] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [wave, setWave] = useState(null);
   const soundRef = useRef(null);
 
   useEffect(() => {
@@ -50,6 +53,8 @@ const App = () => {
           setIsPlaying(false);
         }
       });
+      const waveforms = await getWaveForms(path, flaskServerURL);
+      setWave(waveforms);
     } catch (error) {
       setError("Error playing MP3 file: " + error.message);
     }
@@ -92,6 +97,8 @@ const App = () => {
         )}
       />
       {isPlaying && <Button title="Stop" onPress={stopMP3} />}
+      {wave && <WaveForms waveForms={wave} />}
+      {wave && <WaveForms waveForms={wave} reversed />}
     </SafeAreaView>
   );
 };
