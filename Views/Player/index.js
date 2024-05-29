@@ -14,7 +14,7 @@ const Player = ({ route }) => {
   const [wave, setWave] = useState(null);
   const [coverImage, setCoverImage] = useState(null);
   const [position, setPosition] = useState(0); // Track music position
-  const [sound, setSound] = useState();
+  const [sound, setSound] = useState(null);
   const [duration, setDuration] = useState(0);
   const intervalRef = useRef(null);
 
@@ -22,18 +22,22 @@ const Player = ({ route }) => {
     fetchMP3();
     fetchWaveform();
     fetchCoverPhoto();
+
     return () => {
       if (sound) {
         sound.unloadAsync();
       }
       clearInterval(intervalRef.current);
     };
-  }, []);
+  }, [name]); // Add `name` as a dependency to re-run the effect on navigation
 
   const fetchMP3 = async () => {
     let response;
     try {
       response = await fetch(`${flaskServerURL}/get_mp3/${name}`);
+      if (sound) {
+        await sound.unloadAsync(); // Unload the current sound before loading a new one
+      }
       loadSound(response.url);
     } catch (error) {
       console.error("Error fetching MP3 data:", error);
@@ -60,11 +64,11 @@ const Player = ({ route }) => {
 
   const loadSound = async (uri) => {
     try {
-      const response = await Audio.Sound.createAsync({ uri });
-      const { sound } = response;
-      const { durationMillis } = response.status;
-      setSound(sound);
-      setDuration(durationMillis);
+      const { sound: newSound, status } = await Audio.Sound.createAsync({
+        uri,
+      });
+      setSound(newSound);
+      setDuration(status.durationMillis);
     } catch (error) {
       console.error("Error loading sound:", error);
     }
