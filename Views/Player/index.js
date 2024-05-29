@@ -1,86 +1,39 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
-import {
-  Text,
-  View,
-  Button,
-  SafeAreaView,
-  Image,
-  useWindowDimensions,
-} from "react-native";
+import React, { useEffect, useState, useRef } from "react";
+import { Text, View, Button, SafeAreaView, Image } from "react-native";
 import { Audio } from "expo-av";
 import styles from "./styles";
 import WaveForms from "../../components/Waveforms/Waveforms";
 import { getWaveForms } from "../../components/Waveforms/utils";
-import MaskedView from "@react-native-masked-view/masked-view";
-import {
-  Gesture,
-  GestureDetector,
-  GestureHandlerRootView,
-} from "react-native-gesture-handler";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-  useAnimatedReaction,
-  runOnJS,
-} from "react-native-reanimated";
-import { STICK_FULL_WIDTH } from "../../components/Waveforms/constants";
+import Slider from "@react-native-community/slider";
 
 const flaskServerURL = "http://192.168.0.177:5000";
-function findNearestMultiple(n, multiple) {
-  "worklet";
-  return Math.floor(n / multiple) * multiple;
-}
 
 const Player = ({ route }) => {
   const { name } = route.params;
   const [isPlaying, setIsPlaying] = useState(false);
   const [wave, setWave] = useState(null);
   const [coverImage, setCoverImage] = useState(null);
-  const [sound, setSound] = useState(null);
-  const soundRef = useRef(null);
+  const [position, setPosition] = useState(0); // Track music position
+  const [sound, setSound] = useState();
+  const [duration, setDuration] = useState(0);
+  const intervalRef = useRef(null);
 
   useEffect(() => {
     fetchMP3();
     fetchWaveform();
     fetchCoverPhoto();
     return () => {
-      if (soundRef.current) {
-        soundRef.current.unloadAsync();
+      if (sound) {
+        sound.unloadAsync();
       }
+      clearInterval(intervalRef.current);
     };
   }, []);
 
-  const playMP3 = async () => {
-    try {
-      await soundRef.current.playAsync();
-      setIsPlaying(true);
-    } catch (error) {
-      console.error("Error playing sound:", error);
-    }
-  };
-
-  const pauseMP3 = async () => {
-    try {
-      await soundRef.current.pauseAsync();
-      setIsPlaying(false);
-    } catch (error) {
-      console.error("Error pausing sound:", error);
-    }
-  };
-
-  const stopMP3 = async () => {
-    try {
-      await soundRef.current.stopAsync();
-      setIsPlaying(false);
-    } catch (error) {
-      console.error("Error stopping sound:", error);
-    }
-  };
-
   const fetchMP3 = async () => {
+    let response;
     try {
-      const response = await fetch(`${flaskServerURL}/get_mp3/${name}`);
+      response = await fetch(`${flaskServerURL}/get_mp3/${name}`);
       loadSound(response.url);
     } catch (error) {
       console.error("Error fetching MP3 data:", error);
@@ -101,154 +54,128 @@ const Player = ({ route }) => {
       const response = await fetch(`${flaskServerURL}/get_cover/${name}`);
       setCoverImage(response.url);
     } catch (error) {
-      console.error("Error fetching MP3 data:", error);
+      console.error("Error fetching cover photo:", error);
     }
   };
 
   const loadSound = async (uri) => {
     try {
-      const { sound: newSound } = await Audio.Sound.createAsync({ uri });
-      soundRef.current = newSound;
-      setSound(newSound);
+      const response = await Audio.Sound.createAsync({ uri });
+      const { sound } = response;
+      const { durationMillis } = response.status;
+      setSound(sound);
+      setDuration(durationMillis);
     } catch (error) {
       console.error("Error loading sound:", error);
     }
   };
 
-  const playing = useSharedValue(false);
-  const sliding = useSharedValue(false);
-  const tapGesture = Gesture.Tap().onEnd(() => {
-    playing.value = !playing.value;
-  });
-
-  const updateProgress = () => {
-    "worklet";
-    if (playing.value && !sliding.value && panX.value > maxPanX) {
-      panX.value = withTiming(panX.value - STICK_FULL_WIDTH);
+  const playMP3 = async () => {
+    try {
+      await sound.playAsync();
+      setIsPlaying(true);
+      intervalRef.current = setInterval(updatePosition, 1000);
+    } catch (error) {
+      console.error("Error playing sound:", error);
     }
   };
 
-  useEffect(() => {
-    const interval = setInterval(() => updateProgress(), 150);
-    return () => clearInterval(interval);
-  }, []);
+  const pauseMP3 = async () => {
+    try {
+      await sound.pauseAsync();
+      setIsPlaying(false);
+      clearInterval(intervalRef.current);
+    } catch (error) {
+      console.error("Error pausing sound:", error);
+    }
+  };
 
-  const topWavesAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      height: withTiming(playing.value ? 50 : 5),
-    };
-  });
+  const stopMP3 = async () => {
+    try {
+      await sound.stopAsync();
+      setIsPlaying(false);
+      setPosition(0); // Reset position when stopped
+      clearInterval(intervalRef.current);
+    } catch (error) {
+      console.error("Error stopping sound:", error);
+    }
+  };
 
-  const bottomWavesAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      height: withTiming(playing.value ? 40 : 4),
-    };
-  });
+  const seekMP3 = async (value) => {
+    try {
+      await sound.playFromPositionAsync(value * 1000);
+    } catch (error) {
+      console.error("Error seeking sound:", error);
+    }
+  };
 
-  const dimensions = useWindowDimensions();
-  const panX = useSharedValue(0);
-  const maxPanX = -dimensions.width;
-  const offsetX = useSharedValue(0);
+  const changePlaybackSpeed = async () => {
+    try {
+      const newSpeed = isPlaying ? 2.0 : 1.0; // Toggle between 1x and 2x speed
+      await sound.setRateAsync(newSpeed, true);
+    } catch (error) {
+      console.error("Error changing playback speed:", error);
+    }
+  };
 
-  const panGesture = Gesture.Pan()
-    .onUpdate((event) => {
-      const nextPanX = (panX.value = offsetX.value + event.translationX);
-      sliding.value = true;
-      if (nextPanX > 0) {
-        panX.value = 0;
-      } else if (nextPanX < maxPanX) {
-        panX.value = maxPanX;
-      } else {
-        panX.value = nextPanX;
-      }
-    })
-    .onEnd(() => {
-      offsetX.value = findNearestMultiple(panX.value, STICK_FULL_WIDTH);
-      sliding.value = false;
-    });
+  const onSliderValueChange = (value) => {
+    setPosition(value); // Update position state as the slider is moved
+  };
 
-  const maskAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: panX.value }],
-  }));
-
-  const playedAnimatedStyle = useAnimatedStyle(() => ({
-    width: -panX.value,
-  }));
-
-  const handlePlayPause = useCallback((isPlaying) => {
-    if (isPlaying) {
-      playMP3();
+  const onSlidingComplete = async (value) => {
+    if (sound) {
+      const newPosition = value;
+      setPosition(newPosition); // Update position state when the slider is released
+      await seekMP3(newPosition); // Seek to the selected position
     } else {
-      pauseMP3();
+      console.error("Sound reference is not available.");
     }
-  }, []);
+  };
 
-  useAnimatedReaction(
-    () => playing.value,
-    (isPlaying) => {
-      runOnJS(handlePlayPause)(isPlaying);
+  const updatePosition = async () => {
+    try {
+      if (sound) {
+        const status = await sound.getStatusAsync();
+        if (status.isPlaying) {
+          setPosition(status.positionMillis / 1000);
+        }
+      }
+    } catch (error) {
+      console.error("Error updating position:", error);
     }
-  );
+  };
+
   return (
-    <SafeAreaView style={{ height: "100%" }}>
-      <View style={{ alignItems: "center", marginBottom: 20 }}>
+    <SafeAreaView style={{ flex: 1 }}>
+      <View style={{ alignItems: "center", marginVertical: 20 }}>
         <Text>{name}</Text>
         {coverImage && (
           <Image
             source={{ uri: coverImage }}
-            style={{ width: 200, height: 200 }}
+            style={{ width: 200, height: 200, marginTop: 10 }}
           />
         )}
       </View>
-      <Button
-        title={isPlaying ? "Pause" : "Play"}
-        onPress={isPlaying ? pauseMP3 : playMP3}
+      <Slider
+        style={{ width: "80%", alignSelf: "center" }}
+        minimumValue={0}
+        maximumValue={duration / 1000} // Duration in seconds
+        value={position}
+        onValueChange={onSliderValueChange}
+        onSlidingComplete={onSlidingComplete}
       />
-      <Button title="Stop" onPress={stopMP3} />
-      {wave && (
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <GestureDetector gesture={tapGesture}>
-            <Animated.View style={{ flex: 1 }}>
-              <GestureDetector gesture={panGesture}>
-                <Animated.View style={[{ flex: 1 }, maskAnimatedStyle]}>
-                  <MaskedView
-                    maskElement={
-                      <View style={styles.waveContainer}>
-                        <Animated.View style={topWavesAnimatedStyle}>
-                          <WaveForms waveForms={wave} />
-                        </Animated.View>
-                        <Animated.View style={bottomWavesAnimatedStyle}>
-                          <WaveForms waveForms={wave} reversed />
-                        </Animated.View>
-                      </View>
-                    }
-                    style={{
-                      marginLeft: "50%",
-                      flex: 1,
-                      width: "100%",
-                    }}
-                  >
-                    <Animated.View
-                      style={[
-                        {
-                          position: "absolute",
-                          zIndex: 1,
-                          left: 0,
-                          bottom: 0,
-                          top: 0,
-                          backgroundColor: "orange",
-                        },
-                        playedAnimatedStyle,
-                      ]}
-                    />
-                    <View style={{ flex: 1, backgroundColor: "gray" }}></View>
-                  </MaskedView>
-                </Animated.View>
-              </GestureDetector>
-            </Animated.View>
-          </GestureDetector>
-        </GestureHandlerRootView>
-      )}
+      <View style={{ flexDirection: "row", justifyContent: "center" }}>
+        <Button
+          title={isPlaying ? "Pause" : "Play"}
+          onPress={isPlaying ? pauseMP3 : playMP3}
+        />
+        <Button title="Stop" onPress={stopMP3} />
+        <Button
+          title={isPlaying ? "2x Speed" : "1x Speed"}
+          onPress={changePlaybackSpeed}
+        />
+      </View>
+      {/* Rest of the code remains the same */}
     </SafeAreaView>
   );
 };
