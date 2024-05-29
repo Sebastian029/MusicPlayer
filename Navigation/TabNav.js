@@ -4,6 +4,7 @@ import { Text } from "react-native";
 
 import TabIcon from "../components/TabIcon";
 import Home from "../Views/Home/index";
+import Player from "../Views/Player";
 
 const optionScreen = {
   headerShown: false,
@@ -29,6 +30,7 @@ export default function TabNav() {
       })}
     >
       <Tab.Screen name="Home" component={Home} options={optionScreen} />
+      <Tab.Screen name="Player" component={Player} options={optionScreen} />
     </Tab.Navigator>
   );
 }

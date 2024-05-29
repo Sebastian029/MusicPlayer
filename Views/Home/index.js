@@ -29,12 +29,10 @@ import { STICK_FULL_WIDTH } from "../../components/Waveforms/constants";
 
 const flaskServerURL = "http://192.168.0.177:5000";
 
-const App = () => {
+const App = ({ navigation }) => {
   const [mediaFiles, setMediaFiles] = useState([]);
   const [error, setError] = useState(null);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [wave, setWave] = useState(null);
-  const soundRef = useRef(null);
+  
 
   useEffect(() => {
     fetchMediaFiles();
@@ -50,106 +48,6 @@ const App = () => {
     }
   };
 
-  const playMP3 = async (path, name) => {
-    try {
-      if (soundRef.current) {
-        await soundRef.current.unloadAsync();
-      }
-      const { sound } = await Audio.Sound.createAsync({
-        uri: `${flaskServerURL}/${path}`,
-      });
-      soundRef.current = sound;
-      await sound.playAsync();
-      setIsPlaying(true);
-      sound.setOnPlaybackStatusUpdate((status) => {
-        if (status.didJustFinish) {
-          setIsPlaying(false);
-        }
-      });
-      const waveforms = await getWaveForms(flaskServerURL, name);
-      setWave(waveforms);
-    } catch (error) {
-      setError("Error playing MP3 file: " + error.message);
-    }
-  };
-
-  const stopMP3 = async () => {
-    try {
-      if (soundRef.current) {
-        await soundRef.current.stopAsync();
-        await soundRef.current.unloadAsync();
-        setIsPlaying(false);
-        setWave(null);
-      }
-    } catch (error) {
-      setError("Error stopping MP3 file: " + error.message);
-    }
-  };
-  const findNearestMultiple = (n, multiple) => {
-    "worklet";
-    return Math.floor(n / multiple) * multiple;
-  };
-
-  const playing = useSharedValue(false);
-  const sliding = useSharedValue(false);
-  const tapGesture = Gesture.Tap().onEnd(() => {
-    playing.value = !playing.value;
-    console.log("Tapped! Playing status:", playing.value);
-  });
-
-  const updateProgress = () => {
-    "worklet";
-
-    if (playing.value && !sliding.value && panX.value > maxPanX) {
-      panX.value = withTiming(panX.value - STICK_FULL_WIDTH);
-    }
-  };
-  useEffect(() => {
-    const interval = setInterval(() => updateProgress(), 150);
-    return () => clearInterval(interval);
-  }, []);
-
-  const topWavesAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      height: withTiming(playing.value ? 50 : 5),
-    };
-  });
-
-  const bottomWavesAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      height: withTiming(playing.value ? 40 : 4),
-    };
-  });
-
-  const dimensions = useWindowDimensions();
-  const panX = useSharedValue(0);
-  const maxPanX = -dimensions.width;
-  const offsetX = useSharedValue(0);
-  const panGesture = Gesture.Pan()
-    .onUpdate((event) => {
-      const nextPanX = (panX.value = offsetX.value + event.translationX);
-      sliding.value = true;
-      if (nextPanX > 0) {
-        panX.value = 0;
-      } else if (nextPanX < maxPanX) {
-        panX.value = maxPanX;
-      } else {
-        panX.value = nextPanX;
-      }
-    })
-    .onEnd(() => {
-      offsetX.value = findNearestMultiple(panX.value, STICK_FULL_WIDTH);
-      sliding.value = false;
-    });
-
-  const maskAnimatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: panX.value }],
-  }));
-
-  const playedAnimatedStyle = useAnimatedStyle(() => ({
-    width: -panX.value,
-  }));
-
   return (
     <SafeAreaView style={{ height: "100%" }}>
       <View style={styles.container}>
@@ -159,7 +57,7 @@ const App = () => {
           keyExtractor={(item) => item.name}
           renderItem={({ item }) => (
             <TouchableOpacity
-              onPress={() => playMP3(item.path, item.name)}
+              onPress={() => navigation.navigate("Player", { name: item.name })}
               style={styles.itemContainer}
             >
               {item.image && (
@@ -176,51 +74,6 @@ const App = () => {
           )}
         />
       </View>
-      {isPlaying && <Button title="Stop" onPress={stopMP3} />}
-      {wave && (
-        <GestureHandlerRootView style={{ flex: 1 }}>
-          <GestureDetector gesture={tapGesture}>
-            <Animated.View style={{ flex: 1 }}>
-              <GestureDetector gesture={panGesture}>
-                <Animated.View style={[{ flex: 1 }, maskAnimatedStyle]}>
-                  <MaskedView
-                    maskElement={
-                      <View style={styles.waveContainer}>
-                        <Animated.View style={topWavesAnimatedStyle}>
-                          <WaveForms waveForms={wave} />
-                        </Animated.View>
-                        <Animated.View style={bottomWavesAnimatedStyle}>
-                          <WaveForms waveForms={wave} reversed />
-                        </Animated.View>
-                      </View>
-                    }
-                    style={{
-                      marginLeft: "50%",
-                      flex: 1,
-                      width: "100%",
-                    }}
-                  >
-                    <Animated.View
-                      style={[
-                        {
-                          position: "absolute",
-                          zIndex: 1,
-                          left: 0,
-                          bottom: 0,
-                          top: 0,
-                          backgroundColor: "orange",
-                        },
-                        playedAnimatedStyle,
-                      ]}
-                    />
-                    <View style={{ flex: 1, backgroundColor: "gray" }}></View>
-                  </MaskedView>
-                </Animated.View>
-              </GestureDetector>
-            </Animated.View>
-          </GestureDetector>
-        </GestureHandlerRootView>
-      )}
     </SafeAreaView>
   );
 };
