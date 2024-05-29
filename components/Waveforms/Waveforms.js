@@ -18,7 +18,7 @@ const styles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "flex-end",
-    height: "10%",
+    height: "50%",
   },
   containerReversed: {
     alignItems: "flex-start",

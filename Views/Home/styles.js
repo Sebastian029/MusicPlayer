@@ -2,8 +2,8 @@ import { StyleSheet } from "react-native";
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     margin: 10,
+    height: "80%",
   },
   errorText: {
     color: "red",
@@ -30,6 +30,11 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 14,
     color: "gray",
+  },
+  waveContainer: {
+    backgroundColor: "transparent",
+    justifyContent: "center",
+    flex: 1,
   },
 });
 export default styles;
