@@ -1,6 +1,7 @@
 import * as React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
-import { Text } from "react-native";
+import { Text, StyleSheet } from "react-native";
+import Blur, { BlurView } from "expo-blur";
 
 import TabIcon from "../components/TabIcon";
 import Home from "../Views/Home/index";
@@ -26,7 +27,22 @@ export default function TabNav() {
             </Text>
           );
         },
+        tabBarStyle: {
+          position: "absolute",
+        },
         tabBarHideOnKeyboard: true,
+        tabBarBackground: () => (
+          <BlurView
+            intensity={80}
+            style={{
+              ...StyleSheet.absoluteFillObject,
+              borderTopLeftRadius: 20,
+              borderTopRightRadius: 20,
+              overflow: "hidden",
+              backgroundColor: "transparent",
+            }}
+          />
+        ),
       })}
     >
       <Tab.Screen name="Home" component={Home} options={optionScreen} />

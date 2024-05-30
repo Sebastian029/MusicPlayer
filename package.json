@@ -17,6 +17,7 @@
     "@react-navigation/native-stack": "^6.9.22",
     "expo": "^51.0.8",
     "expo-av": "~14.0.5",
+    "expo-blur": "^13.0.2",
     "expo-dev-client": "~4.0.15",
     "expo-status-bar": "~1.11.1",
     "react": "18.2.0",

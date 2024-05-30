@@ -3,7 +3,7 @@ import { StyleSheet } from "react-native";
 const styles = StyleSheet.create({
   container: {
     margin: 10,
-    height: "80%",
+    height: "110%",
   },
   errorText: {
     color: "red",

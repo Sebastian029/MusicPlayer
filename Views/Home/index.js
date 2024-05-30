@@ -32,7 +32,6 @@ const flaskServerURL = "http://192.168.0.177:5000";
 const App = ({ navigation }) => {
   const [mediaFiles, setMediaFiles] = useState([]);
   const [error, setError] = useState(null);
-  
 
   useEffect(() => {
     fetchMediaFiles();
@@ -57,7 +56,12 @@ const App = ({ navigation }) => {
           keyExtractor={(item) => item.name}
           renderItem={({ item }) => (
             <TouchableOpacity
-              onPress={() => navigation.navigate("Player", { name: item.name })}
+              onPress={() =>
+                navigation.navigate("Player", {
+                  paramId: item.id,
+                  paramName: item.name,
+                })
+              }
               style={styles.itemContainer}
             >
               {item.image && (

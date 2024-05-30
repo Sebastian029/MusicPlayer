@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useRef, useCallback } from "react";
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useCallback,
+  useContext,
+} from "react";
 import {
   Text,
   View,
@@ -24,25 +30,37 @@ import Animated, {
   useAnimatedReaction,
   runOnJS,
 } from "react-native-reanimated";
+import { useTheme } from "../../hooks/ThemeContext";
 import { STICK_FULL_WIDTH } from "../../components/Waveforms/constants";
+import { BARS_NUM } from "../../components/Waveforms/constants";
 
 const flaskServerURL = "http://192.168.0.177:5000";
 
 const Player = ({ route }) => {
-  const { name } = route.params;
+  const { paramId = 1, paramName = "" } = route.params || {};
+  const { theme } = useTheme();
+  const [id, setId] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [wave, setWave] = useState(null);
   const [coverImage, setCoverImage] = useState(null);
   const [position, setPosition] = useState(0);
   const [sound, setSound] = useState(null);
+  const [name, setName] = useState("");
   const [duration, setDuration] = useState(0);
   const [soundLoaded, setSoundLoaded] = useState(false);
   const intervalRef = useRef(null);
 
   useEffect(() => {
+    setName(paramName);
+    setId(paramId);
+  }, [paramName, paramId]);
+
+  useEffect(() => {
+    setSound(null);
     fetchMP3();
     fetchWaveform();
     fetchCoverPhoto();
+    fetchName();
 
     return () => {
       if (sound) {
@@ -51,15 +69,31 @@ const Player = ({ route }) => {
       }
       clearInterval(intervalRef.current);
     };
-  }, [name]);
+  }, [id]);
+
+  useEffect(() => {
+    panX.value = 0;
+  }, [soundLoaded]);
+
+  const fetchName = async () => {
+    try {
+      const response = await fetch(`${flaskServerURL}/get_name/${id}`);
+      const data = await response.json();
+      console.log(data.name);
+      setName(data.name);
+    } catch (error) {
+      console.error("Error fetching MP3 name data:", error);
+    }
+  };
 
   const fetchMP3 = async () => {
     let response;
     try {
-      response = await fetch(`${flaskServerURL}/get_mp3/${name}`);
+      response = await fetch(`${flaskServerURL}/get_mp3/${id}`);
       if (sound) {
         await sound.unloadAsync();
       }
+
       await loadSound(response.url);
     } catch (error) {
       console.error("Error fetching MP3 data:", error);
@@ -68,7 +102,7 @@ const Player = ({ route }) => {
 
   const fetchWaveform = async () => {
     try {
-      const waveforms = await getWaveForms(flaskServerURL, name);
+      const waveforms = await getWaveForms(flaskServerURL, id);
       setWave(waveforms);
     } catch (error) {
       console.error("Error fetching waveforms data:", error);
@@ -77,7 +111,7 @@ const Player = ({ route }) => {
 
   const fetchCoverPhoto = async () => {
     try {
-      const response = await fetch(`${flaskServerURL}/get_cover/${name}`);
+      const response = await fetch(`${flaskServerURL}/get_cover/${id}`);
       setCoverImage(response.url);
     } catch (error) {
       console.error("Error fetching cover photo:", error);
@@ -90,7 +124,8 @@ const Player = ({ route }) => {
         uri,
       });
       setSound(newSound);
-      setDuration(Math.floor(status.durationMillis / 1000));
+      if (status.durationMillis > 100)
+        setDuration(Math.floor(status.durationMillis / 1000));
       setSoundLoaded(true);
     } catch (error) {
       console.error("Error loading sound:", error);
@@ -101,7 +136,7 @@ const Player = ({ route }) => {
     if (soundLoaded) {
       try {
         await sound.playAsync();
-        setIsPlaying(true);
+        playing.value = true;
         //  intervalRef.current = setInterval(updatePosition, 1000); // Update position every second
       } catch (error) {
         console.error("Error playing sound:", error);
@@ -113,7 +148,7 @@ const Player = ({ route }) => {
     if (soundLoaded) {
       try {
         await sound.pauseAsync();
-        setIsPlaying(false);
+        playing.value = false;
         //   clearInterval(intervalRef.current);
       } catch (error) {
         console.error("Error pausing sound:", error);
@@ -125,7 +160,7 @@ const Player = ({ route }) => {
     if (soundLoaded) {
       try {
         await sound.stopAsync();
-        setIsPlaying(false);
+        playing.value = false;
         //   setPosition(0); // Reset position when stopped
         //   clearInterval(intervalRef.current);
       } catch (error) {
@@ -136,10 +171,11 @@ const Player = ({ route }) => {
 
   const seekMP3 = useCallback(
     async (bar) => {
-      console.log((bar / 200) * duration);
+      //console.log((bar / BARS_NUM) * duration);
       if (soundLoaded) {
         try {
-          await sound.playFromPositionAsync((bar / 200) * duration * 1000);
+          await sound.playFromPositionAsync((bar / BARS_NUM) * duration * 1000);
+          playing.value = true;
         } catch (error) {
           console.error("Error seeking sound:", error);
         }
@@ -148,11 +184,6 @@ const Player = ({ route }) => {
     [soundLoaded, sound]
   );
 
-  useEffect(() => {
-    const interval = setInterval(() => updateProgress(), 200 / 220);
-    return () => clearInterval(interval);
-  }, []);
-
   const playing = useSharedValue(false);
   const sliding = useSharedValue(false);
   const tapGesture = Gesture.Tap().onEnd(() => {
@@ -160,9 +191,14 @@ const Player = ({ route }) => {
   });
 
   const panX = useSharedValue(0);
-  const maxPanX = -Math.round(STICK_FULL_WIDTH * 200);
+  const maxPanX = -Math.round(STICK_FULL_WIDTH * BARS_NUM);
   const offsetX = useSharedValue(0);
   const segmentIndex = useSharedValue(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => updateProgress(), BARS_NUM / 220);
+    return () => clearInterval(interval);
+  }, []);
 
   const updateProgress = () => {
     "worklet";
@@ -209,43 +245,41 @@ const Player = ({ route }) => {
     };
   });
 
-  const handlePlayPause = useCallback(
-    (isPlaying) => {
-      if (isPlaying) {
-        playMP3();
-      } else {
-        pauseMP3();
-      }
-    },
-    [soundLoaded]
-  );
-
   useAnimatedReaction(
     () => playing.value,
-    (isPlaying) => {
-      runOnJS(handlePlayPause)(isPlaying);
+    () => {
+      if (playing.value) {
+        runOnJS(playMP3)();
+      } else {
+        runOnJS(pauseMP3)();
+      }
     }
   );
 
+  const nextSong = () => {
+    setId(id + 1);
+  };
+  const previousSong = () => {
+    if (id - 1 > 0) setId(id - 1);
+  };
+
   return (
-    <SafeAreaView style={{ flex: 1 }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
       <View style={{ alignItems: "center", marginVertical: 20 }}>
         <Text>{name}</Text>
         {coverImage && (
-          <Image
-            source={{ uri: coverImage }}
-            style={{ width: 200, height: 200, marginTop: 10 }}
-          />
+          <View style={styles.shadowContainer}>
+            <Image
+              source={{ uri: coverImage }}
+              style={{ width: 200, height: 200, marginTop: 10 }}
+            />
+          </View>
         )}
       </View>
 
       <View style={{ flexDirection: "row", justifyContent: "center" }}>
-        <Button
-          title={isPlaying ? "Pause" : "Play"}
-          onPress={isPlaying ? pauseMP3 : playMP3}
-          disabled={!soundLoaded}
-        />
-        <Button title="Stop" onPress={stopMP3} disabled={!soundLoaded} />
+        <Button title="Next" onPress={nextSong} />
+        <Button title="Previous" onPress={previousSong} />
       </View>
       {wave && (
         <GestureHandlerRootView style={{ flex: 1 }}>
