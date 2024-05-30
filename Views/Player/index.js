@@ -33,10 +33,10 @@ const Player = ({ route }) => {
   const [isPlaying, setIsPlaying] = useState(false);
   const [wave, setWave] = useState(null);
   const [coverImage, setCoverImage] = useState(null);
-  const [position, setPosition] = useState(0); // Track music position
+  const [position, setPosition] = useState(0);
   const [sound, setSound] = useState(null);
   const [duration, setDuration] = useState(0);
-  const [soundLoaded, setSoundLoaded] = useState(false); // Track if sound is loaded
+  const [soundLoaded, setSoundLoaded] = useState(false);
   const intervalRef = useRef(null);
 
   useEffect(() => {
@@ -90,7 +90,7 @@ const Player = ({ route }) => {
         uri,
       });
       setSound(newSound);
-      setDuration(status.durationMillis);
+      setDuration(Math.floor(status.durationMillis / 1000));
       setSoundLoaded(true);
     } catch (error) {
       console.error("Error loading sound:", error);
@@ -102,7 +102,7 @@ const Player = ({ route }) => {
       try {
         await sound.playAsync();
         setIsPlaying(true);
-        intervalRef.current = setInterval(updatePosition, 1000); // Update position every second
+        //  intervalRef.current = setInterval(updatePosition, 1000); // Update position every second
       } catch (error) {
         console.error("Error playing sound:", error);
       }
@@ -114,7 +114,7 @@ const Player = ({ route }) => {
       try {
         await sound.pauseAsync();
         setIsPlaying(false);
-        clearInterval(intervalRef.current);
+        //   clearInterval(intervalRef.current);
       } catch (error) {
         console.error("Error pausing sound:", error);
       }
@@ -126,8 +126,8 @@ const Player = ({ route }) => {
       try {
         await sound.stopAsync();
         setIsPlaying(false);
-        setPosition(0); // Reset position when stopped
-        clearInterval(intervalRef.current);
+        //   setPosition(0); // Reset position when stopped
+        //   clearInterval(intervalRef.current);
       } catch (error) {
         console.error("Error stopping sound:", error);
       }
@@ -135,10 +135,11 @@ const Player = ({ route }) => {
   };
 
   const seekMP3 = useCallback(
-    async (value) => {
+    async (bar) => {
+      console.log((bar / 200) * duration);
       if (soundLoaded) {
         try {
-          await sound.playFromPositionAsync(value * 1000);
+          await sound.playFromPositionAsync((bar / 200) * duration * 1000);
         } catch (error) {
           console.error("Error seeking sound:", error);
         }
@@ -147,53 +148,10 @@ const Player = ({ route }) => {
     [soundLoaded, sound]
   );
 
-  const changePlaybackSpeed = useCallback(async () => {
-    if (soundLoaded) {
-      try {
-        const newSpeed = isPlaying ? 2.0 : 1.0; // Toggle between 1x and 2x speed
-        await sound.setRateAsync(newSpeed, true);
-      } catch (error) {
-        console.error("Error changing playback speed:", error);
-      }
-    }
-  }, [soundLoaded, isPlaying, sound]);
-
-  const onSliderValueChange = useCallback((value) => {
-    setPosition(value);
+  useEffect(() => {
+    const interval = setInterval(() => updateProgress(), 200 / 220);
+    return () => clearInterval(interval);
   }, []);
-
-  const onSlidingComplete = useCallback(
-    async (value) => {
-      if (soundLoaded) {
-        try {
-          const newPosition = value;
-          setPosition(newPosition); // Update position state when the slider is released
-          await seekMP3(newPosition); // Seek to the selected position
-        } catch (error) {
-          console.error("Error seeking sound:", error);
-        }
-      }
-    },
-    [soundLoaded, seekMP3]
-  );
-
-  const updatePosition = useCallback(async () => {
-    if (soundLoaded && isPlaying) {
-      const status = await sound.getStatusAsync();
-      setPosition(status.positionMillis / 1000);
-    }
-  }, [soundLoaded, isPlaying, sound]);
-
-  const forward10Seconds = useCallback(() => {
-    if (soundLoaded) {
-      const newPosition = position + 10;
-      if (newPosition < duration / 1000) {
-        seekMP3(newPosition);
-      } else {
-        seekMP3(duration / 1000 - 1); // Prevent overflow
-      }
-    }
-  }, [soundLoaded, position, duration, seekMP3]);
 
   const playing = useSharedValue(false);
   const sliding = useSharedValue(false);
@@ -201,17 +159,17 @@ const Player = ({ route }) => {
     playing.value = !playing.value;
   });
 
-  const dimensions = useWindowDimensions();
-  const segmentWidth = useSharedValue(0);
-
-  useEffect(() => {
-    segmentWidth.value = dimensions.width / (duration / 200); // Calculate segment width based on duration
-  }, [dimensions.width, duration]);
-
   const panX = useSharedValue(0);
-  const maxPanX = -dimensions.width;
+  const maxPanX = -Math.round(STICK_FULL_WIDTH * 200);
   const offsetX = useSharedValue(0);
+  const segmentIndex = useSharedValue(0);
 
+  const updateProgress = () => {
+    "worklet";
+    if (playing.value && panX.value > maxPanX) {
+      panX.value = withTiming(panX.value - STICK_FULL_WIDTH);
+    }
+  };
   const panGesture = Gesture.Pan()
     .onUpdate((event) => {
       sliding.value = true;
@@ -227,9 +185,8 @@ const Player = ({ route }) => {
     .onEnd(() => {
       offsetX.value = panX.value;
       sliding.value = false;
-      const segmentIndex = Math.round(-panX.value / segmentWidth.value);
-      const newPosition = segmentIndex * 0.2; // 200ms corresponds to 0.2 seconds
-      runOnJS(seekMP3)(newPosition); // Update music position based on waveform pan
+      segmentIndex.value = Math.round(-panX.value / STICK_FULL_WIDTH);
+      runOnJS(seekMP3)(segmentIndex.value);
     });
 
   const maskAnimatedStyle = useAnimatedStyle(() => ({
@@ -261,7 +218,7 @@ const Player = ({ route }) => {
       }
     },
     [soundLoaded]
-  ); // Include soundLoaded as dependency
+  );
 
   useAnimatedReaction(
     () => playing.value,
@@ -286,19 +243,9 @@ const Player = ({ route }) => {
         <Button
           title={isPlaying ? "Pause" : "Play"}
           onPress={isPlaying ? pauseMP3 : playMP3}
-          disabled={!soundLoaded} // Disable buttons until sound is loaded
+          disabled={!soundLoaded}
         />
         <Button title="Stop" onPress={stopMP3} disabled={!soundLoaded} />
-        <Button
-          title={isPlaying ? "2x Speed" : "1x Speed"}
-          onPress={changePlaybackSpeed}
-          disabled={!soundLoaded}
-        />
-        <Button
-          title="Forward 10s"
-          onPress={forward10Seconds}
-          disabled={!soundLoaded}
-        />
       </View>
       {wave && (
         <GestureHandlerRootView style={{ flex: 1 }}>
@@ -320,7 +267,7 @@ const Player = ({ route }) => {
                     style={{
                       marginLeft: "50%",
                       flex: 1,
-                      width: "100%",
+                      width: "1000%",
                     }}
                   >
                     <Animated.View
@@ -331,7 +278,7 @@ const Player = ({ route }) => {
                           left: 0,
                           bottom: 0,
                           top: 0,
-                          backgroundColor: "orange",
+                          backgroundColor: "red",
                         },
                         playedAnimatedStyle,
                       ]}

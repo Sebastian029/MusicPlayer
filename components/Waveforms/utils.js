@@ -15,7 +15,7 @@ export async function getWaveForms(flaskServerURL, path) {
     for (let i = 0; i < parsedData.length; i++) {
       waveforms.push(parsedData[i]);
     }
-    console.log(waveforms.length);
+    // console.log(waveforms.length);
     return waveforms;
   } catch (error) {
     console.error("Error fetching waveform data:", error);
