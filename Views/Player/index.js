@@ -39,11 +39,12 @@ const Player = ({ route }) => {
   const [wave, setWave] = useState(null);
   const [coverImage, setCoverImage] = useState(null);
   const [position, setPosition] = useState(0);
-  const [sound, setSound] = useState(null);
   const [name, setName] = useState("");
   const [duration, setDuration] = useState(0);
   const [soundLoaded, setSoundLoaded] = useState(false);
+  const [repeatMode, setRepeatMode] = useState(false);
   const intervalRef = useRef(null);
+  const soundRef = useRef(null);
 
   useEffect(() => {
     setName(paramName);
@@ -51,35 +52,63 @@ const Player = ({ route }) => {
   }, [paramName, paramId]);
 
   useEffect(() => {
-    setSound(null);
-    fetchDuration();
-    fetchMP3();
+    fetchSound();
     fetchWaveform();
     fetchCoverPhoto();
     fetchName();
-
+    fetchDuration();
+    resetWaveformAnimation();
     return () => {
-      if (sound) {
-        sound.unloadAsync();
-        setSoundLoaded(false);
+      if (soundRef.current) {
+        soundRef.current.unloadAsync();
       }
       clearInterval(intervalRef.current);
     };
   }, [id]);
 
-  useEffect(() => {
-    panX.value = 0;
-  }, [soundLoaded]);
+  const handlePlaybackEnd = async () => {
+    console.log(repeatMode);
+    if (repeatMode) {
+      // If repeat mode is enabled, replay the current song
+      await seekMP3(0);
+    } else {
+      // Otherwise, move to the next song
+      nextSong();
+    }
+    resetWaveformAnimation();
+  };
 
+  useEffect(() => {
+    if (soundLoaded && soundRef.current) {
+      const playbackStatusSubscription =
+        soundRef.current.setOnPlaybackStatusUpdate((status) => {
+          if (status.didJustFinish) {
+            // If the playback finished, trigger the appropriate action
+            handlePlaybackEnd();
+          }
+        });
+      return () => {
+        if (playbackStatusSubscription) {
+          playbackStatusSubscription.remove();
+        }
+      };
+    }
+  }, [soundLoaded, soundRef.current]);
   const fetchName = async () => {
     try {
       const response = await fetch(`${flaskServerURL}/get_name/${id}`);
       const data = await response.json();
-      console.log(data.name);
       setName(data.name);
     } catch (error) {
       console.error("Error fetching MP3 name data:", error);
     }
+  };
+
+  const resetWaveformAnimation = () => {
+    panX.value = 0;
+    offsetX.value = 0;
+    segmentIndex.value = 0;
+    playing.value = false;
   };
   const fetchDuration = async () => {
     try {
@@ -91,14 +120,12 @@ const Player = ({ route }) => {
     }
   };
 
-  const fetchMP3 = async () => {
-    let response;
+  const fetchSound = async () => {
     try {
-      response = await fetch(`${flaskServerURL}/get_mp3/${id}`);
-      if (sound) {
-        await sound.unloadAsync();
+      const response = await fetch(`${flaskServerURL}/get_mp3/${id}`);
+      if (soundRef.current) {
+        await soundRef.current.unloadAsync();
       }
-
       await loadSound(response.url);
     } catch (error) {
       console.error("Error fetching MP3 data:", error);
@@ -128,9 +155,7 @@ const Player = ({ route }) => {
       const { sound: newSound, status } = await Audio.Sound.createAsync({
         uri,
       });
-      setSound(newSound);
-      //  if (status.durationMillis > 100)
-      //   setDuration(Math.floor(status.durationMillis / 1000));
+      soundRef.current = newSound;
       setSoundLoaded(true);
     } catch (error) {
       console.error("Error loading sound:", error);
@@ -140,8 +165,7 @@ const Player = ({ route }) => {
   const playMP3 = async () => {
     if (soundLoaded) {
       try {
-        await sound.playAsync();
-        playing.value = true;
+        await soundRef.current.playAsync();
         setIsPlaying(true);
       } catch (error) {
         console.error("Error playing sound:", error);
@@ -152,10 +176,8 @@ const Player = ({ route }) => {
   const pauseMP3 = async () => {
     if (soundLoaded) {
       try {
-        await sound.pauseAsync();
-        playing.value = false;
+        await soundRef.current.pauseAsync();
         setIsPlaying(false);
-        //   clearInterval(intervalRef.current);
       } catch (error) {
         console.error("Error pausing sound:", error);
       }
@@ -165,10 +187,10 @@ const Player = ({ route }) => {
   const stopMP3 = async () => {
     if (soundLoaded) {
       try {
-        await sound.stopAsync();
-        playing.value = false;
-        //   setPosition(0); // Reset position when stopped
-        //   clearInterval(intervalRef.current);
+        await soundRef.current.stopAsync();
+        setIsPlaying(false);
+        // Reset position when stopped
+        setPosition(0);
       } catch (error) {
         console.error("Error stopping sound:", error);
       }
@@ -177,17 +199,17 @@ const Player = ({ route }) => {
 
   const seekMP3 = useCallback(
     async (bar) => {
-      //console.log((bar / BARS_NUM) * duration);
       if (soundLoaded) {
         try {
-          await sound.playFromPositionAsync((bar / BARS_NUM) * duration * 1000);
-          playing.value = true;
+          await soundRef.current.playFromPositionAsync(
+            (bar / BARS_NUM) * duration * 1000
+          );
         } catch (error) {
           console.error("Error seeking sound:", error);
         }
       }
     },
-    [soundLoaded, sound]
+    [soundLoaded, soundRef.current]
   );
 
   const playing = useSharedValue(false);
@@ -212,9 +234,7 @@ const Player = ({ route }) => {
   const updateProgress = () => {
     "worklet";
     setPosition(
-      Math.floor(
-        (Math.round(-panX.value / STICK_FULL_WIDTH) / BARS_NUM) * 220
-      )
+      Math.floor((Math.round(-panX.value / STICK_FULL_WIDTH) / BARS_NUM) * 220)
     );
     if (playing.value && panX.value > maxPanX) {
       panX.value = withTiming(panX.value - STICK_FULL_WIDTH);
@@ -271,11 +291,9 @@ const Player = ({ route }) => {
   );
 
   const nextSong = () => {
-    stopMP3();
     setId(id + 1);
   };
   const previousSong = () => {
-    stopMP3();
     if (id - 1 > 0) setId(id - 1);
   };
 
@@ -370,7 +388,14 @@ const Player = ({ route }) => {
           style={[styles.icon, { color: theme.primary }]}
           onPress={nextSong}
         />
-        <Ionicons name="repeat" style={[styles.icon, { color: theme.card }]} />
+        <Ionicons
+          name="repeat"
+          style={[
+            styles.icon,
+            { color: repeatMode ? theme.primary : theme.card },
+          ]}
+          onPress={() => setRepeatMode(!repeatMode)}
+        />
       </View>
     </SafeAreaView>
   );
