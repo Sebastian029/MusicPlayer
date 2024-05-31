@@ -5,14 +5,7 @@ import React, {
   useCallback,
   useContext,
 } from "react";
-import {
-  Text,
-  View,
-  Button,
-  SafeAreaView,
-  Image,
-  useWindowDimensions,
-} from "react-native";
+import { Text, View, Button, SafeAreaView, Image } from "react-native";
 import { Audio } from "expo-av";
 import styles from "./styles";
 import WaveForms from "../../components/Waveforms/Waveforms";
@@ -30,6 +23,8 @@ import Animated, {
   useAnimatedReaction,
   runOnJS,
 } from "react-native-reanimated";
+import { Feather, Ionicons } from "@expo/vector-icons";
+
 import { useTheme } from "../../hooks/ThemeContext";
 import { STICK_FULL_WIDTH } from "../../components/Waveforms/constants";
 import { BARS_NUM } from "../../components/Waveforms/constants";
@@ -57,6 +52,7 @@ const Player = ({ route }) => {
 
   useEffect(() => {
     setSound(null);
+    fetchDuration();
     fetchMP3();
     fetchWaveform();
     fetchCoverPhoto();
@@ -83,6 +79,15 @@ const Player = ({ route }) => {
       setName(data.name);
     } catch (error) {
       console.error("Error fetching MP3 name data:", error);
+    }
+  };
+  const fetchDuration = async () => {
+    try {
+      const response = await fetch(`${flaskServerURL}/get_duration/${id}`);
+      const data = await response.json();
+      setDuration(Math.floor(data.duration));
+    } catch (error) {
+      console.error("Error fetching MP3 duration data:", error);
     }
   };
 
@@ -124,8 +129,8 @@ const Player = ({ route }) => {
         uri,
       });
       setSound(newSound);
-      if (status.durationMillis > 100)
-        setDuration(Math.floor(status.durationMillis / 1000));
+      //  if (status.durationMillis > 100)
+      //   setDuration(Math.floor(status.durationMillis / 1000));
       setSoundLoaded(true);
     } catch (error) {
       console.error("Error loading sound:", error);
@@ -137,7 +142,7 @@ const Player = ({ route }) => {
       try {
         await sound.playAsync();
         playing.value = true;
-        //  intervalRef.current = setInterval(updatePosition, 1000); // Update position every second
+        setIsPlaying(true);
       } catch (error) {
         console.error("Error playing sound:", error);
       }
@@ -149,6 +154,7 @@ const Player = ({ route }) => {
       try {
         await sound.pauseAsync();
         playing.value = false;
+        setIsPlaying(false);
         //   clearInterval(intervalRef.current);
       } catch (error) {
         console.error("Error pausing sound:", error);
@@ -196,12 +202,20 @@ const Player = ({ route }) => {
   const segmentIndex = useSharedValue(0);
 
   useEffect(() => {
-    const interval = setInterval(() => updateProgress(), BARS_NUM / 220);
+    const interval = setInterval(() => {
+      updateProgress();
+    }, BARS_NUM / 220);
+
     return () => clearInterval(interval);
   }, []);
 
   const updateProgress = () => {
     "worklet";
+    setPosition(
+      Math.floor(
+        (Math.round(-panX.value / STICK_FULL_WIDTH) / BARS_NUM) * 220
+      )
+    );
     if (playing.value && panX.value > maxPanX) {
       panX.value = withTiming(panX.value - STICK_FULL_WIDTH);
     }
@@ -257,32 +271,34 @@ const Player = ({ route }) => {
   );
 
   const nextSong = () => {
+    stopMP3();
     setId(id + 1);
   };
   const previousSong = () => {
+    stopMP3();
     if (id - 1 > 0) setId(id - 1);
+  };
+
+  const formatTime = (seconds) => {
+    const minutes = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
-      <View style={{ alignItems: "center", marginVertical: 20 }}>
-        <Text>{name}</Text>
+      <View style={styles.mainContainer}>
+        <Text style={styles.topText}>Now Playing</Text>
         {coverImage && (
           <View style={styles.shadowContainer}>
-            <Image
-              source={{ uri: coverImage }}
-              style={{ width: 200, height: 200, marginTop: 10 }}
-            />
+            <Image source={{ uri: coverImage }} style={styles.coverImage} />
           </View>
         )}
+        <Text style={styles.songTitle}>{name}</Text>
       </View>
 
-      <View style={{ flexDirection: "row", justifyContent: "center" }}>
-        <Button title="Next" onPress={nextSong} />
-        <Button title="Previous" onPress={previousSong} />
-      </View>
       {wave && (
-        <GestureHandlerRootView style={{ flex: 1 }}>
+        <GestureHandlerRootView style={{ height: "25%" }}>
           <GestureDetector gesture={tapGesture}>
             <Animated.View style={{ flex: 1 }}>
               <GestureDetector gesture={panGesture}>
@@ -312,12 +328,14 @@ const Player = ({ route }) => {
                           left: 0,
                           bottom: 0,
                           top: 0,
-                          backgroundColor: "red",
+                          backgroundColor: theme.primary,
                         },
                         playedAnimatedStyle,
                       ]}
                     />
-                    <View style={{ flex: 1, backgroundColor: "gray" }}></View>
+                    <View
+                      style={{ flex: 1, backgroundColor: theme.card }}
+                    ></View>
                   </MaskedView>
                 </Animated.View>
               </GestureDetector>
@@ -325,11 +343,34 @@ const Player = ({ route }) => {
           </GestureDetector>
         </GestureHandlerRootView>
       )}
-      <View style={{ margin: 20 }}>
-        <Text>
-          Current Position: {Math.floor(position)}s /{" "}
-          {Math.floor(duration / 1000)}s
+      <View style={styles.timeContainer}>
+        <Text style={[styles.timeText, { color: theme.primary }]}>
+          {formatTime(position)}
         </Text>
+        <Text style={[styles.timeText, { color: theme.card }]}>
+          {formatTime(duration)}
+        </Text>
+      </View>
+      <View style={styles.bottomContainer}>
+        <Ionicons name="shuffle" style={[styles.icon, { color: theme.card }]} />
+        <Ionicons
+          name="play-skip-back"
+          style={[styles.icon, { color: theme.primary }]}
+          onPress={previousSong}
+        />
+        <Ionicons
+          name={isPlaying ? "pause-circle" : "play-circle"}
+          style={[styles.iconLarge, { color: theme.primary }]}
+          onPress={() => (playing.value = !playing.value)}
+          disabled={!soundLoaded}
+        />
+
+        <Ionicons
+          name="play-skip-forward"
+          style={[styles.icon, { color: theme.primary }]}
+          onPress={nextSong}
+        />
+        <Ionicons name="repeat" style={[styles.icon, { color: theme.card }]} />
       </View>
     </SafeAreaView>
   );

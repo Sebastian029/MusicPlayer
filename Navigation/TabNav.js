@@ -2,6 +2,7 @@ import * as React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Text, StyleSheet } from "react-native";
 import Blur, { BlurView } from "expo-blur";
+import { useTheme } from "../hooks/ThemeContext";
 
 import TabIcon from "../components/TabIcon";
 import Home from "../Views/Home/index";
@@ -14,6 +15,8 @@ const optionScreen = {
 const Tab = createBottomTabNavigator();
 
 export default function TabNav() {
+  const { theme } = useTheme();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -22,7 +25,7 @@ export default function TabNav() {
         },
         tabBarLabel: ({ focused }) => {
           return (
-            <Text style={{ color: focused ? "blue" : "gray" }}>
+            <Text style={{ color: focused ? theme.primary : theme.card }}>
               {route.name}
             </Text>
           );
@@ -47,6 +50,7 @@ export default function TabNav() {
     >
       <Tab.Screen name="Home" component={Home} options={optionScreen} />
       <Tab.Screen name="Player" component={Player} options={optionScreen} />
+      <Tab.Screen name="Profile" component={Player} options={optionScreen} />
     </Tab.Navigator>
   );
 }
