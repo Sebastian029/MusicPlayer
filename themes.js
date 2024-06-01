@@ -5,13 +5,15 @@ export const lightTheme = {
   text: "black",
   border: "gray",
   notification: "red",
+  shadow: "black",
 };
 
 export const darkTheme = {
-  primary: "blue",
-  background: "gray",
+  primary: "#FF5836",
+  background: "#000814",
   card: "gray",
   text: "white",
   border: "gray",
   notification: "red",
+  shadow: "#FF5836",
 };

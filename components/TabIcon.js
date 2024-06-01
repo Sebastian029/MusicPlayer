@@ -10,10 +10,7 @@ const TabIcon = ({ routeName, focused }) => {
   switch (routeName) {
     case "Home":
       return (
-        <AntDesign
-          name="home"
-          style={[styles.icon, { color: theme.primary }]}
-        />
+        <AntDesign name="home" style={[styles.icon, { color: iconColor }]} />
       );
 
     case "Player":

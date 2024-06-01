@@ -26,10 +26,13 @@ import Animated, {
   withTiming,
 } from "react-native-reanimated";
 import { STICK_FULL_WIDTH } from "../../components/Waveforms/constants";
+import { useTheme } from "../../hooks/ThemeContext";
 
 const flaskServerURL = "http://192.168.0.177:5000";
 
 const App = ({ navigation }) => {
+  const { theme } = useTheme();
+
   const [mediaFiles, setMediaFiles] = useState([]);
   const [error, setError] = useState(null);
 
@@ -48,7 +51,7 @@ const App = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={{ height: "100%" }}>
+    <SafeAreaView style={{ height: "100%", backgroundColor: theme.background }}>
       <View style={styles.container}>
         {error && <Text style={styles.errorText}>{error}</Text>}
         <FlatList
@@ -71,8 +74,12 @@ const App = ({ navigation }) => {
                 />
               )}
               <View style={styles.textContainer}>
-                <Text style={styles.title}>{item.title}</Text>
-                <Text style={styles.name}>{item.name}</Text>
+                <Text style={[styles.title, { color: theme.primary }]}>
+                  {item.name}
+                </Text>
+                <Text style={{ color: "gray", fontSize: 12 }}>
+                  {item.artist}
+                </Text>
               </View>
             </TouchableOpacity>
           )}

@@ -7,6 +7,7 @@ import { useTheme } from "../hooks/ThemeContext";
 import TabIcon from "../components/TabIcon";
 import Home from "../Views/Home/index";
 import Player from "../Views/Player";
+import Profile from "../Views/Profile";
 
 const optionScreen = {
   headerShown: false,
@@ -50,7 +51,7 @@ export default function TabNav() {
     >
       <Tab.Screen name="Home" component={Home} options={optionScreen} />
       <Tab.Screen name="Player" component={Player} options={optionScreen} />
-      <Tab.Screen name="Profile" component={Player} options={optionScreen} />
+      <Tab.Screen name="Profile" component={Profile} options={optionScreen} />
     </Tab.Navigator>
   );
 }

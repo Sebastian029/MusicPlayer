@@ -37,7 +37,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   shadowContainer: {
-    shadowColor: "black",
     shadowOffset: { width: 0, height: 0 },
     shadowOpacity: 0.8,
     shadowRadius: 10,

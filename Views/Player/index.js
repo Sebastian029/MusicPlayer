@@ -75,7 +75,7 @@ const Player = ({ route }) => {
       // Otherwise, move to the next song
       nextSong();
     }
-    resetWaveformAnimation();
+    // resetWaveformAnimation();
   };
 
   useEffect(() => {
@@ -306,16 +306,18 @@ const Player = ({ route }) => {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
       <View style={styles.mainContainer}>
-        <Text style={styles.topText}>Now Playing</Text>
+        <Text style={[styles.topText, { color: theme.primary }]}>
+          Now Playing
+        </Text>
         {coverImage && (
-          <View style={styles.shadowContainer}>
+          <View style={[styles.shadowContainer, { shadowColor: theme.shadow }]}>
             <Image source={{ uri: coverImage }} style={styles.coverImage} />
           </View>
         )}
-        <Text style={styles.songTitle}>{name}</Text>
+        <Text style={[styles.songTitle, { color: theme.primary }]}>{name}</Text>
       </View>
 
-      {wave && (
+      {wave && soundLoaded && (
         <GestureHandlerRootView style={{ height: "25%" }}>
           <GestureDetector gesture={tapGesture}>
             <Animated.View style={{ flex: 1 }}>
