@@ -1,4 +1,5 @@
 import { StyleSheet } from "react-native";
+import { SearchBar } from "react-native-screens";
 
 const styles = StyleSheet.create({
   container: {
@@ -35,6 +36,15 @@ const styles = StyleSheet.create({
     backgroundColor: "transparent",
     justifyContent: "center",
     flex: 1,
+  },
+  searchBar: {
+    flexDirection: "column",
+    justifyContent: "center",
+    paddingTop: 5,
+    paddingHorizontal: 2,
+    borderRadius: 8,
+    marginBottom: 10,
+    fontSize: 16,
   },
 });
 export default styles;

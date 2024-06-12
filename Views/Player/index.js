@@ -39,10 +39,11 @@ const Player = ({ route }) => {
   const [wave, setWave] = useState(null);
   const [coverImage, setCoverImage] = useState(null);
   const [position, setPosition] = useState(0);
-  const [name, setName] = useState("");
-  const [duration, setDuration] = useState(0);
+  const [name, setName] = useState(0);
+  const [duration, setDuration] = useState(220);
   const [soundLoaded, setSoundLoaded] = useState(false);
   const [repeatMode, setRepeatMode] = useState(false);
+  const [randomMode, setRandomMode] = useState(false);
   const intervalRef = useRef(null);
   const soundRef = useRef(null);
 
@@ -53,10 +54,10 @@ const Player = ({ route }) => {
 
   useEffect(() => {
     fetchSound();
+    fetchDuration();
     fetchWaveform();
     fetchCoverPhoto();
     fetchName();
-    fetchDuration();
     resetWaveformAnimation();
     return () => {
       if (soundRef.current) {
@@ -68,14 +69,23 @@ const Player = ({ route }) => {
 
   const handlePlaybackEnd = async () => {
     console.log(repeatMode);
-    if (repeatMode) {
-      // If repeat mode is enabled, replay the current song
-      await seekMP3(0);
+    if (randomMode) {
+      try {
+        const response = await fetch(`${flaskServerURL}/random_song_id`);
+        const data = await response.json();
+        const randomId = data.random_song_id;
+        setId(randomId);
+      } catch (error) {
+        console.error("Error fetching random song ID:", error);
+      }
     } else {
-      // Otherwise, move to the next song
-      nextSong();
+      if (repeatMode) {
+        await seekMP3(0);
+      } else {
+        nextSong();
+      }
     }
-    // resetWaveformAnimation();
+    resetWaveformAnimation();
   };
 
   useEffect(() => {
@@ -83,7 +93,6 @@ const Player = ({ route }) => {
       const playbackStatusSubscription =
         soundRef.current.setOnPlaybackStatusUpdate((status) => {
           if (status.didJustFinish) {
-            // If the playback finished, trigger the appropriate action
             handlePlaybackEnd();
           }
         });
@@ -226,7 +235,7 @@ const Player = ({ route }) => {
   useEffect(() => {
     const interval = setInterval(() => {
       updateProgress();
-    }, BARS_NUM / 220);
+    }, BARS_NUM / duration);
 
     return () => clearInterval(interval);
   }, []);
@@ -234,8 +243,13 @@ const Player = ({ route }) => {
   const updateProgress = () => {
     "worklet";
     setPosition(
-      Math.floor((Math.round(-panX.value / STICK_FULL_WIDTH) / BARS_NUM) * 220)
+      Math.floor(
+        (Math.round(-panX.value / STICK_FULL_WIDTH) / BARS_NUM) * duration
+      )
     );
+
+    // console.log((Math.round(-panX.value / STICK_FULL_WIDTH) / BARS_NUM) * duration );
+    //  console.log(duration);
     if (playing.value && panX.value > maxPanX) {
       panX.value = withTiming(panX.value - STICK_FULL_WIDTH);
     }
@@ -365,14 +379,27 @@ const Player = ({ route }) => {
       )}
       <View style={styles.timeContainer}>
         <Text style={[styles.timeText, { color: theme.primary }]}>
-          {formatTime(position)}
+          {formatTime(
+            Math.floor(
+              (Math.round(-panX.value / STICK_FULL_WIDTH) / BARS_NUM) * duration
+            )
+          )}
         </Text>
         <Text style={[styles.timeText, { color: theme.card }]}>
           {formatTime(duration)}
         </Text>
       </View>
       <View style={styles.bottomContainer}>
-        <Ionicons name="shuffle" style={[styles.icon, { color: theme.card }]} />
+        <Ionicons
+          name="shuffle"
+          style={[
+            styles.icon,
+            { color: randomMode ? theme.primary : theme.card },
+          ]}
+          onPress={() => {
+            setRandomMode(!randomMode);
+          }}
+        />
         <Ionicons
           name="play-skip-back"
           style={[styles.icon, { color: theme.primary }]}
@@ -396,7 +423,9 @@ const Player = ({ route }) => {
             styles.icon,
             { color: repeatMode ? theme.primary : theme.card },
           ]}
-          onPress={() => setRepeatMode(!repeatMode)}
+          onPress={() => {
+            setRepeatMode(!repeatMode);
+          }}
         />
       </View>
     </SafeAreaView>

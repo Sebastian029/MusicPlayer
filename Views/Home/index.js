@@ -7,7 +7,7 @@ import {
   SafeAreaView,
   Image,
   TouchableOpacity,
-  useWindowDimensions,
+  TextInput,
 } from "react-native";
 import { Audio } from "expo-av";
 import styles from "./styles";
@@ -35,6 +35,7 @@ const App = ({ navigation }) => {
 
   const [mediaFiles, setMediaFiles] = useState([]);
   const [error, setError] = useState(null);
+  const [searchQuery, setSearchQuery] = useState("");
 
   useEffect(() => {
     fetchMediaFiles();
@@ -50,12 +51,32 @@ const App = ({ navigation }) => {
     }
   };
 
+  const filteredMediaFiles = mediaFiles.filter(
+    (item) =>
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.artist.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <SafeAreaView style={{ height: "100%", backgroundColor: theme.background }}>
       <View style={styles.container}>
         {error && <Text style={styles.errorText}>{error}</Text>}
+        <View
+          style={[
+            styles.searchBar,
+            { borderWidth: 2, borderColor: theme.primary },
+          ]}
+        >
+          <TextInput
+            style={[styles.searchBar, { color: theme.primary }]}
+            placeholder="Search by name or artist..."
+            placeholderTextColor="gray"
+            onChangeText={(text) => setSearchQuery(text)}
+            value={searchQuery}
+          />
+        </View>
         <FlatList
-          data={mediaFiles}
+          data={filteredMediaFiles}
           keyExtractor={(item) => item.name}
           renderItem={({ item }) => (
             <TouchableOpacity
