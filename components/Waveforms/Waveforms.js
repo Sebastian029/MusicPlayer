@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { StyleSheet, View } from "react-native";
 import { STICK_MARGIN, STICK_WIDTH } from "./constants";
 
@@ -28,5 +28,6 @@ const styles = StyleSheet.create({
     backgroundColor: "red",
     width: STICK_WIDTH,
     marginRight: STICK_MARGIN,
+    borderRadius: STICK_WIDTH / 2,
   },
 });

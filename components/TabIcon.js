@@ -6,7 +6,7 @@ import { useTheme } from "../hooks/ThemeContext";
 
 const TabIcon = ({ routeName, focused }) => {
   const { theme } = useTheme();
-  const iconColor = focused ? theme.primary : theme.card;
+  const iconColor = focused ? theme.accent : theme.muted;
   switch (routeName) {
     case "Home":
       return (

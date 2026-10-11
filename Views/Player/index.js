@@ -1,15 +1,6 @@
-import React, {
-  useEffect,
-  useState,
-  useRef,
-  useCallback,
-  useContext,
-} from "react";
-import { Text, View, Button, SafeAreaView, Image } from "react-native";
-import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
-import styles from "./styles";
-import WaveForms from "../../components/Waveforms/Waveforms";
-import { getWaveForms } from "../../components/Waveforms/utils";
+import React, { useEffect, useState } from "react";
+import { Text, View, Image } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import MaskedView from "@react-native-masked-view/masked-view";
 import {
   Gesture,
@@ -21,248 +12,93 @@ import Animated, {
   useAnimatedStyle,
   withTiming,
   Easing,
-  useAnimatedReaction,
   runOnJS,
 } from "react-native-reanimated";
-import { Feather, Ionicons } from "@expo/vector-icons";
-
-import { useTheme } from "../../hooks/ThemeContext";
+import { Ionicons } from "@expo/vector-icons";
+import styles from "./styles";
+import WaveForms from "../../components/Waveforms/Waveforms";
+import { getWaveForms } from "../../components/Waveforms/utils";
 import { STICK_FULL_WIDTH } from "../../components/Waveforms/constants";
-import { BARS_NUM } from "../../components/Waveforms/constants";
+import { API_URL } from "../../config";
+import { useTheme } from "../../hooks/ThemeContext";
+import { usePlayer, usePosition } from "../../hooks/PlayerContext";
+import { useFavorites } from "../../hooks/FavoritesContext";
 
-const flaskServerURL = "http://192.168.50.249:5000";
+const formatTime = (seconds) => {
+  const minutes = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
+};
 
-const Player = ({ route }) => {
-  const { paramId = 1, paramName = "" } = route.params || {};
+const Player = () => {
   const { theme } = useTheme();
-  const [id, setId] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
+  const {
+    current,
+    isPlaying,
+    repeat,
+    shuffle,
+    setRepeat,
+    setShuffle,
+    togglePlay,
+    playNext,
+    playPrevious,
+    seekTo,
+  } = usePlayer();
+  const { position, duration } = usePosition();
+  const { isFavorite, toggleFavorite } = useFavorites();
+
   const [wave, setWave] = useState(null);
-  const [coverImage, setCoverImage] = useState(null);
-  const [position, setPosition] = useState(0);
-  const [name, setName] = useState(0);
-  const [duration, setDuration] = useState(220);
-  const [soundLoaded, setSoundLoaded] = useState(false);
-  const [repeatMode, setRepeatMode] = useState(false);
-  const [randomMode, setRandomMode] = useState(false);
-  const intervalRef = useRef(null);
-  const soundRef = useRef(null);
-
-  useEffect(() => {
-    setName(paramName);
-    setId(paramId);
-  }, [paramName, paramId]);
-
-  useEffect(() => {
-    // iOS silences audio when the phone is in silent mode unless this is set
-    setAudioModeAsync({ playsInSilentMode: true }).catch((e) =>
-      console.error("Error setting audio mode:", e)
-    );
-  }, []);
-
-  useEffect(() => {
-    if (!id) return;
-    fetchSound();
-    fetchDuration();
-    fetchWaveform();
-    fetchCoverPhoto();
-    fetchName();
-    resetWaveformAnimation();
-    return () => {
-      if (soundRef.current) {
-        soundRef.current.remove();
-        soundRef.current = null;
-      }
-      clearInterval(intervalRef.current);
-    };
-  }, [id]);
-
-  const handlePlaybackEnd = async () => {
-    console.log(repeatMode);
-    if (randomMode) {
-      try {
-        const response = await fetch(`${flaskServerURL}/random_song_id`);
-        const data = await response.json();
-        const randomId = data.random_song_id;
-        setId(randomId);
-      } catch (error) {
-        console.error("Error fetching random song ID:", error);
-      }
-    } else {
-      if (repeatMode) {
-        await seekMP3(0);
-      } else {
-        nextSong();
-      }
-    }
-    resetWaveformAnimation();
-  };
-
-  useEffect(() => {
-    if (soundLoaded && soundRef.current) {
-      const playbackStatusSubscription = soundRef.current.addListener(
-        "playbackStatusUpdate",
-        (status) => {
-          if (status.didJustFinish) {
-            handlePlaybackEnd();
-          }
-        }
-      );
-      return () => {
-        if (playbackStatusSubscription) {
-          playbackStatusSubscription.remove();
-        }
-      };
-    }
-  }, [soundLoaded, soundRef.current]);
-  const fetchName = async () => {
-    try {
-      const response = await fetch(`${flaskServerURL}/get_name/${id}`);
-      const data = await response.json();
-      setName(data.name);
-    } catch (error) {
-      console.error("Error fetching MP3 name data:", error);
-    }
-  };
-
-  const resetWaveformAnimation = () => {
-    panX.value = 0;
-    offsetX.value = 0;
-    segmentIndex.value = 0;
-    playing.value = false;
-  };
-  const fetchDuration = async () => {
-    try {
-      const response = await fetch(`${flaskServerURL}/get_duration/${id}`);
-      const data = await response.json();
-      setDuration(Math.floor(data.duration));
-    } catch (error) {
-      console.error("Error fetching MP3 duration data:", error);
-    }
-  };
-
-  const fetchSound = async () => {
-    try {
-      const response = await fetch(`${flaskServerURL}/get_mp3/${id}`);
-      if (soundRef.current) {
-        soundRef.current.remove();
-        soundRef.current = null;
-        setSoundLoaded(false);
-      }
-      await loadSound(response.url);
-    } catch (error) {
-      console.error("Error fetching MP3 data:", error);
-    }
-  };
-
-  const fetchWaveform = async () => {
-    try {
-      const waveforms = await getWaveForms(flaskServerURL, id);
-      setWave(waveforms);
-    } catch (error) {
-      console.error("Error fetching waveforms data:", error);
-    }
-  };
-
-  const fetchCoverPhoto = async () => {
-    try {
-      const response = await fetch(`${flaskServerURL}/get_cover/${id}`);
-      setCoverImage(response.url);
-    } catch (error) {
-      console.error("Error fetching cover photo:", error);
-    }
-  };
-
-  const loadSound = async (uri) => {
-    try {
-      const newSound = createAudioPlayer({ uri });
-      soundRef.current = newSound;
-      setSoundLoaded(true);
-    } catch (error) {
-      console.error("Error loading sound:", error);
-    }
-  };
-
-  const playMP3 = async () => {
-    if (soundLoaded) {
-      try {
-        soundRef.current.play();
-        setIsPlaying(true);
-      } catch (error) {
-        console.error("Error playing sound:", error);
-      }
-    }
-  };
-
-  const pauseMP3 = async () => {
-    if (soundLoaded) {
-      try {
-        soundRef.current.pause();
-        setIsPlaying(false);
-      } catch (error) {
-        console.error("Error pausing sound:", error);
-      }
-    }
-  };
-
-  const stopMP3 = async () => {
-    if (soundLoaded) {
-      try {
-        soundRef.current.pause();
-        await soundRef.current.seekTo(0);
-        setIsPlaying(false);
-        // Reset position when stopped
-        setPosition(0);
-      } catch (error) {
-        console.error("Error stopping sound:", error);
-      }
-    }
-  };
-
-  const seekMP3 = useCallback(
-    async (bar) => {
-      if (soundLoaded) {
-        try {
-          const total =
-            soundRef.current.duration > 0 ? soundRef.current.duration : duration;
-          await soundRef.current.seekTo((bar / BARS_NUM) * total);
-          soundRef.current.play();
-        } catch (error) {
-          console.error("Error seeking sound:", error);
-        }
-      }
-    },
-    [soundLoaded, soundRef.current, duration]
-  );
-
-  const playing = useSharedValue(false);
-  const sliding = useSharedValue(false);
-  const tapGesture = Gesture.Tap().onEnd(() => {
-    playing.value = !playing.value;
-  });
+  const waveWidth = wave ? wave.bars.length * STICK_FULL_WIDTH : 0;
+  const songDuration = wave && wave.duration > 0 ? wave.duration : duration;
 
   const panX = useSharedValue(0);
-  const maxPanX = -Math.round(STICK_FULL_WIDTH * BARS_NUM);
   const offsetX = useSharedValue(0);
-  const segmentIndex = useSharedValue(0);
+  const sliding = useSharedValue(false);
+  const playing = useSharedValue(false);
+  const waveWidthValue = useSharedValue(0);
+  const songDurationValue = useSharedValue(0);
 
-  // Drive the waveform from the real playback position instead of a free-running timer
   useEffect(() => {
-    const interval = setInterval(() => {
-      const player = soundRef.current;
-      if (!player || sliding.value) return;
-      const total = player.duration > 0 ? player.duration : duration;
-      const fraction = Math.min(Math.max(player.currentTime / total, 0), 1);
-      const target = -fraction * BARS_NUM * STICK_FULL_WIDTH;
-      panX.value = withTiming(target, {
-        duration: 250,
-        easing: Easing.linear,
-      });
-      setPosition(Math.floor(player.currentTime));
-    }, 250);
+    if (!current) {
+      return;
+    }
+    let isOutdated = false;
+    setWave(null);
+    panX.value = 0;
+    offsetX.value = 0;
+    getWaveForms(API_URL, current.id).then((waveforms) => {
+      if (!isOutdated) {
+        setWave(waveforms);
+      }
+    });
+    return () => {
+      isOutdated = true;
+    };
+  }, [current?.id]);
 
-    return () => clearInterval(interval);
-  }, [duration]);
+  useEffect(() => {
+    playing.value = isPlaying;
+  }, [isPlaying]);
+
+  useEffect(() => {
+    waveWidthValue.value = waveWidth;
+    songDurationValue.value = songDuration;
+  }, [waveWidth, songDuration]);
+
+  useEffect(() => {
+    if (sliding.value || !songDuration || !waveWidth) {
+      return;
+    }
+    const played = Math.min(position / songDuration, 1);
+    panX.value = withTiming(-played * waveWidth, {
+      duration: 250,
+      easing: Easing.linear,
+    });
+  }, [position, songDuration, waveWidth]);
+
+  const tapGesture = Gesture.Tap().onEnd(() => {
+    runOnJS(togglePlay)();
+  });
 
   const panGesture = Gesture.Pan()
     .onBegin(() => {
@@ -271,19 +107,15 @@ const Player = ({ route }) => {
     .onUpdate((event) => {
       sliding.value = true;
       const nextPanX = offsetX.value + event.translationX;
-      if (nextPanX > 0) {
-        panX.value = 0;
-      } else if (nextPanX < maxPanX) {
-        panX.value = maxPanX;
-      } else {
-        panX.value = nextPanX;
-      }
+      panX.value = Math.min(0, Math.max(-waveWidthValue.value, nextPanX));
     })
     .onEnd(() => {
-      offsetX.value = panX.value;
       sliding.value = false;
-      segmentIndex.value = Math.round(-panX.value / STICK_FULL_WIDTH);
-      runOnJS(seekMP3)(segmentIndex.value);
+      const fraction = -panX.value / waveWidthValue.value;
+      runOnJS(seekTo)(fraction * songDurationValue.value);
+    })
+    .onFinalize(() => {
+      sliding.value = false;
     });
 
   const maskAnimatedStyle = useAnimatedStyle(() => ({
@@ -294,58 +126,56 @@ const Player = ({ route }) => {
     width: -panX.value,
   }));
 
-  const topWavesAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      height: withTiming(playing.value ? 50 : 5),
-    };
-  });
+  const topWavesAnimatedStyle = useAnimatedStyle(() => ({
+    height: withTiming(playing.value ? 50 : 5),
+  }));
 
-  const bottomWavesAnimatedStyle = useAnimatedStyle(() => {
-    return {
-      height: withTiming(playing.value ? 40 : 4),
-    };
-  });
+  const bottomWavesAnimatedStyle = useAnimatedStyle(() => ({
+    height: withTiming(playing.value ? 40 : 4),
+  }));
 
-  useAnimatedReaction(
-    () => playing.value,
-    () => {
-      if (playing.value) {
-        runOnJS(playMP3)();
-      } else {
-        runOnJS(pauseMP3)();
-      }
-    }
-  );
-
-  const nextSong = () => {
-    setId(id + 1);
-  };
-  const previousSong = () => {
-    if (id - 1 > 0) setId(id - 1);
-  };
-
-  const formatTime = (seconds) => {
-    const minutes = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${minutes}:${secs < 10 ? "0" : ""}${secs}`;
-  };
+  if (!current) {
+    return (
+      <SafeAreaView
+        edges={["top", "left", "right"]}
+        style={[styles.empty, { backgroundColor: theme.background }]}
+      >
+        <Text style={[styles.topText, { color: theme.text }]}>
+          Wybierz utwór z listy Home
+        </Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.background }}>
+    <SafeAreaView
+      edges={["top", "left", "right"]}
+      style={{ flex: 1, backgroundColor: theme.background }}
+    >
       <View style={styles.mainContainer}>
-        <Text style={[styles.topText, { color: theme.primary }]}>
-          Now Playing
-        </Text>
-        {coverImage && (
-          <View style={[styles.shadowContainer, { shadowColor: theme.shadow }]}>
-            <Image source={{ uri: coverImage }} style={styles.coverImage} />
+        {current.image && (
+          <View style={[styles.coverFrame, { borderColor: theme.track }]}>
+            <Image
+              source={{ uri: `${API_URL}/${current.image}` }}
+              style={styles.coverImage}
+            />
           </View>
         )}
-        <Text style={[styles.songTitle, { color: theme.primary }]}>{name}</Text>
+        <View style={styles.textBlock}>
+          <Text
+            numberOfLines={2}
+            style={[styles.songTitle, { color: theme.text }]}
+          >
+            {current.name}
+          </Text>
+          <Text numberOfLines={1} style={[styles.artist, { color: theme.muted }]}>
+            {current.artist}
+          </Text>
+        </View>
       </View>
 
-      {wave && soundLoaded && (
-        <GestureHandlerRootView style={{ height: "25%" }}>
+      {waveWidth > 0 && (
+        <GestureHandlerRootView style={styles.waveArea}>
           <GestureDetector gesture={tapGesture}>
             <Animated.View style={{ flex: 1 }}>
               <GestureDetector gesture={panGesture}>
@@ -354,35 +184,23 @@ const Player = ({ route }) => {
                     maskElement={
                       <View style={styles.waveContainer}>
                         <Animated.View style={topWavesAnimatedStyle}>
-                          <WaveForms waveForms={wave} />
+                          <WaveForms waveForms={wave.bars} />
                         </Animated.View>
                         <Animated.View style={bottomWavesAnimatedStyle}>
-                          <WaveForms waveForms={wave} reversed />
+                          <WaveForms waveForms={wave.bars} reversed />
                         </Animated.View>
                       </View>
                     }
-                    style={{
-                      marginLeft: "50%",
-                      flex: 1,
-                      width: "1000%",
-                    }}
+                    style={{ marginLeft: "50%", flex: 1, width: waveWidth }}
                   >
                     <Animated.View
                       style={[
-                        {
-                          position: "absolute",
-                          zIndex: 1,
-                          left: 0,
-                          bottom: 0,
-                          top: 0,
-                          backgroundColor: theme.primary,
-                        },
+                        styles.playedPart,
+                        { backgroundColor: theme.accent },
                         playedAnimatedStyle,
                       ]}
                     />
-                    <View
-                      style={{ flex: 1, backgroundColor: theme.card }}
-                    ></View>
+                    <View style={{ flex: 1, backgroundColor: theme.track }} />
                   </MaskedView>
                 </Animated.View>
               </GestureDetector>
@@ -390,55 +208,49 @@ const Player = ({ route }) => {
           </GestureDetector>
         </GestureHandlerRootView>
       )}
+
       <View style={styles.timeContainer}>
-        <Text style={[styles.timeText, { color: theme.primary }]}>
-          {formatTime(
-            Math.floor(
-              (Math.round(-panX.value / STICK_FULL_WIDTH) / BARS_NUM) * duration
-            )
-          )}
+        <Text style={[styles.timeText, { color: theme.text }]}>
+          {formatTime(position)}
         </Text>
-        <Text style={[styles.timeText, { color: theme.card }]}>
-          {formatTime(duration)}
+        <Text style={[styles.timeText, { color: theme.muted }]}>
+          {formatTime(songDuration)}
         </Text>
       </View>
+
       <View style={styles.bottomContainer}>
         <Ionicons
           name="shuffle"
-          style={[
-            styles.icon,
-            { color: randomMode ? theme.primary : theme.card },
-          ]}
-          onPress={() => {
-            setRandomMode(!randomMode);
-          }}
+          style={[styles.icon, { color: shuffle ? theme.text : theme.muted }]}
+          onPress={() => setShuffle(!shuffle)}
         />
         <Ionicons
           name="play-skip-back"
-          style={[styles.icon, { color: theme.primary }]}
-          onPress={previousSong}
+          style={[styles.icon, { color: theme.text }]}
+          onPress={playPrevious}
         />
         <Ionicons
           name={isPlaying ? "pause-circle" : "play-circle"}
-          style={[styles.iconLarge, { color: theme.primary }]}
-          onPress={() => (playing.value = !playing.value)}
-          disabled={!soundLoaded}
+          style={[styles.iconLarge, { color: theme.accent }]}
+          onPress={togglePlay}
         />
-
         <Ionicons
           name="play-skip-forward"
-          style={[styles.icon, { color: theme.primary }]}
-          onPress={nextSong}
+          style={[styles.icon, { color: theme.text }]}
+          onPress={playNext}
         />
         <Ionicons
           name="repeat"
-          style={[
-            styles.icon,
-            { color: repeatMode ? theme.primary : theme.card },
-          ]}
-          onPress={() => {
-            setRepeatMode(!repeatMode);
-          }}
+          style={[styles.icon, { color: repeat ? theme.text : theme.muted }]}
+          onPress={() => setRepeat(!repeat)}
+        />
+      </View>
+
+      <View style={styles.favoriteContainer}>
+        <Ionicons
+          name={isFavorite(current) ? "heart" : "heart-outline"}
+          style={[styles.icon, { color: theme.text }]}
+          onPress={() => toggleFavorite(current)}
         />
       </View>
     </SafeAreaView>

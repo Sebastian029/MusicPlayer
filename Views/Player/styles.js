@@ -1,52 +1,42 @@
 import { StyleSheet } from "react-native";
 
 const styles = StyleSheet.create({
-  container: {
-    margin: 10,
-    height: "80%",
-  },
-  errorText: {
-    color: "red",
-    textAlign: "center",
-    marginVertical: 10,
-  },
-  itemContainer: {
-    flexDirection: "row",
-    marginVertical: 10,
-    alignItems: "center",
-  },
-  image: {
-    width: 50,
-    height: 50,
-    marginRight: 10,
-  },
-  textContainer: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 16,
-    fontWeight: "bold",
-  },
-  name: {
-    fontSize: 14,
-    color: "gray",
-  },
   waveContainer: {
     backgroundColor: "transparent",
     justifyContent: "center",
     flex: 1,
   },
-  shadowContainer: {
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.8,
-    shadowRadius: 10,
+  coverFrame: {
+    borderRadius: 25,
+    borderWidth: 1,
+    overflow: "hidden",
   },
   topText: { fontSize: 20, fontFamily: "Helvetica" },
   songTitle: {
-    fontSize: 25,
+    fontSize: 22,
     fontFamily: "Helvetica",
     fontWeight: "bold",
-    letterSpacing: 1.3,
+    letterSpacing: 1,
+    textAlign: "center",
+  },
+  textBlock: {
+    alignSelf: "stretch",
+    paddingHorizontal: 24,
+    gap: 4,
+  },
+  artist: {
+    fontSize: 16,
+    textAlign: "center",
+  },
+  playedPart: {
+    position: "absolute",
+    zIndex: 1,
+    left: 0,
+    bottom: 0,
+    top: 0,
+  },
+  waveArea: {
+    height: 120,
   },
   timeText: {
     fontSize: 15,
@@ -56,14 +46,15 @@ const styles = StyleSheet.create({
   },
 
   mainContainer: {
+    flex: 1,
     flexDirection: "column",
     alignItems: "center",
-    height: "50%",
-    gap: 20,
+    justifyContent: "center",
+    gap: 16,
   },
   coverImage: {
-    width: 300,
-    height: 300,
+    width: 260,
+    height: 260,
     borderRadius: 25,
   },
   timeContainer: {
@@ -77,6 +68,15 @@ const styles = StyleSheet.create({
   },
   icon: {
     fontSize: 30,
+  },
+  favoriteContainer: {
+    alignItems: "center",
+    marginTop: 10,
+  },
+  empty: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   iconLarge: {
     fontSize: 70,

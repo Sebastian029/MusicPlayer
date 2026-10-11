@@ -2,39 +2,24 @@ import { StyleSheet } from "react-native";
 
 const styles = StyleSheet.create({
   container: {
-    margin: 10,
-    height: "110%",
+    margin: 20,
   },
-  errorText: {
-    color: "red",
-    textAlign: "center",
-    marginVertical: 10,
-  },
-  itemContainer: {
-    flexDirection: "row",
-    marginVertical: 10,
-    alignItems: "center",
-  },
-  image: {
-    width: 50,
-    height: 50,
-    marginRight: 10,
-  },
-  textContainer: {
-    flex: 1,
-  },
-  title: {
-    fontSize: 16,
+  header: {
+    fontSize: 28,
     fontWeight: "bold",
+    marginBottom: 20,
   },
-  name: {
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 14,
+  },
+  label: {
+    fontSize: 16,
+  },
+  value: {
     fontSize: 14,
-    color: "gray",
-  },
-  waveContainer: {
-    backgroundColor: "transparent",
-    justifyContent: "center",
-    flex: 1,
   },
 });
 export default styles;

@@ -1,112 +1,182 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useState } from "react";
 import {
+  ActivityIndicator,
   Text,
   View,
   FlatList,
-  Button,
-  SafeAreaView,
   Image,
   TouchableOpacity,
   TextInput,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
 import styles from "./styles";
-import WaveForms from "../../components/Waveforms/Waveforms";
-import { getWaveForms } from "../../components/Waveforms/utils";
-import MaskedView from "@react-native-masked-view/masked-view";
-import {
-  Gesture,
-  GestureDetector,
-  GestureHandlerRootView,
-  TapGestureHandler,
-} from "react-native-gesture-handler";
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withTiming,
-} from "react-native-reanimated";
-import { STICK_FULL_WIDTH } from "../../components/Waveforms/constants";
+import { API_URL } from "../../config";
 import { useTheme } from "../../hooks/ThemeContext";
+import { usePlayer } from "../../hooks/PlayerContext";
+import { useFavorites } from "../../hooks/FavoritesContext";
 
-const flaskServerURL = "http://192.168.50.249:5000";
-
-const App = ({ navigation }) => {
+const Home = ({ navigation }) => {
   const { theme } = useTheme();
+  const { songs, playlists, loading, error, loadSongs, playSong, current } =
+    usePlayer();
+  const { isFavorite, toggleFavorite } = useFavorites();
 
-  const [mediaFiles, setMediaFiles] = useState([]);
-  const [error, setError] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [onlyFavorites, setOnlyFavorites] = useState(false);
+  const [selectedPlaylist, setSelectedPlaylist] = useState(null);
 
-  useEffect(() => {
-    fetchMediaFiles();
-  }, []);
+  const chips = [{ name: null }, ...playlists];
 
-  const fetchMediaFiles = async () => {
-    try {
-      const response = await fetch(`${flaskServerURL}/media_files`);
-      const data = await response.json();
-      setMediaFiles(data);
-    } catch (error) {
-      setError("Error fetching media files: " + error.message);
-    }
+  const playlistSongs = selectedPlaylist
+    ? songs.filter((song) => song.playlist === selectedPlaylist)
+    : songs;
+
+  const query = searchQuery.toLowerCase();
+  const visibleSongs = playlistSongs.filter((song) => {
+    const matchesSearch =
+      song.name.toLowerCase().includes(query) ||
+      song.artist.toLowerCase().includes(query);
+    const matchesFavorites = !onlyFavorites || isFavorite(song);
+    return matchesSearch && matchesFavorites;
+  });
+
+  const openSong = (song) => {
+    playSong(song, playlistSongs);
+    navigation.navigate("Player");
   };
 
-  const filteredMediaFiles = mediaFiles.filter(
-    (item) =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.artist.toLowerCase().includes(searchQuery.toLowerCase())
+  const renderEmpty = () => {
+    if (loading) {
+      return <ActivityIndicator color={theme.muted} size="large" />;
+    }
+    if (error) {
+      return (
+        <View style={styles.centered}>
+          <Text style={[styles.errorText, { color: theme.danger }]}>
+            Nie można połączyć z serwerem: {error}
+          </Text>
+          <TouchableOpacity onPress={loadSongs}>
+            <Text style={[styles.retry, { color: theme.text }]}>
+              Spróbuj ponownie
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
+    return (
+      <Text style={[styles.emptyText, { color: theme.muted }]}>
+        {onlyFavorites ? "Brak ulubionych utworów" : "Brak utworów"}
+      </Text>
+    );
+  };
+
+  const renderChip = ({ item: chip }) => {
+    const selected = chip.name === selectedPlaylist;
+    return (
+      <TouchableOpacity
+        onPress={() => setSelectedPlaylist(chip.name)}
+        style={[
+          styles.chip,
+          {
+            borderColor: selected ? theme.text : theme.track,
+            backgroundColor: selected ? theme.text : theme.surface,
+          },
+        ]}
+      >
+        {chip.image && (
+          <Image
+            source={{ uri: `${API_URL}/${chip.image}` }}
+            style={styles.chipImage}
+          />
+        )}
+        <Text style={{ color: selected ? theme.background : theme.text }}>
+          {chip.name || "Wszystkie"}
+        </Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderSong = ({ item: song }) => (
+    <TouchableOpacity
+      onPress={() => openSong(song)}
+      style={styles.itemContainer}
+    >
+      {song.image && (
+        <Image
+          source={{ uri: `${API_URL}/${song.image}` }}
+          style={styles.image}
+        />
+      )}
+      <View style={styles.textContainer}>
+        <Text
+          style={[
+            styles.title,
+            { color: current?.id === song.id ? theme.accent : theme.text },
+          ]}
+        >
+          {song.name}
+        </Text>
+        <Text style={[styles.artist, { color: theme.muted }]}>
+          {song.artist}
+        </Text>
+      </View>
+      <Ionicons
+        name={isFavorite(song) ? "heart" : "heart-outline"}
+        style={[styles.heart, { color: theme.text }]}
+        onPress={() => toggleFavorite(song)}
+      />
+    </TouchableOpacity>
   );
 
   return (
-    <SafeAreaView style={{ height: "100%", backgroundColor: theme.background }}>
+    <SafeAreaView
+      edges={["top", "left", "right"]}
+      style={{ flex: 1, backgroundColor: theme.background }}
+    >
       <View style={styles.container}>
-        {error && <Text style={styles.errorText}>{error}</Text>}
-        <View
-          style={[
-            styles.searchBar,
-            { borderWidth: 2, borderColor: theme.primary },
-          ]}
-        >
-          <TextInput
-            style={[styles.searchBar, { color: theme.primary }]}
-            placeholder="Search by name or artist..."
-            placeholderTextColor="gray"
-            onChangeText={(text) => setSearchQuery(text)}
-            value={searchQuery}
+        <View style={styles.searchRow}>
+          <View
+            style={[
+              styles.searchBar,
+              styles.searchBox,
+              { borderWidth: 1.5, borderColor: theme.track },
+            ]}
+          >
+            <TextInput
+              style={[styles.searchBar, { color: theme.text }]}
+              placeholder="Search by name or artist..."
+              placeholderTextColor={theme.muted}
+              onChangeText={setSearchQuery}
+              value={searchQuery}
+            />
+          </View>
+          <Ionicons
+            name={onlyFavorites ? "heart" : "heart-outline"}
+            style={[styles.filterIcon, { color: theme.text }]}
+            onPress={() => setOnlyFavorites(!onlyFavorites)}
           />
         </View>
         <FlatList
-          data={filteredMediaFiles}
-          keyExtractor={(item) => item.name}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() =>
-                navigation.navigate("Player", {
-                  paramId: item.id,
-                  paramName: item.name,
-                })
-              }
-              style={styles.itemContainer}
-            >
-              {item.image && (
-                <Image
-                  source={{ uri: `${flaskServerURL}/${item.image}` }}
-                  style={styles.image}
-                />
-              )}
-              <View style={styles.textContainer}>
-                <Text style={[styles.title, { color: theme.primary }]}>
-                  {item.name}
-                </Text>
-                <Text style={{ color: "gray", fontSize: 12 }}>
-                  {item.artist}
-                </Text>
-              </View>
-            </TouchableOpacity>
-          )}
+          horizontal
+          data={chips}
+          keyExtractor={(chip) => String(chip.name)}
+          renderItem={renderChip}
+          showsHorizontalScrollIndicator={false}
+          style={styles.chips}
+        />
+        <FlatList
+          data={visibleSongs}
+          keyExtractor={(song) => String(song.id)}
+          renderItem={renderSong}
+          refreshing={loading}
+          onRefresh={loadSongs}
+          ListEmptyComponent={renderEmpty}
+          contentContainerStyle={{ paddingBottom: 76 }}
         />
       </View>
     </SafeAreaView>
   );
 };
 
-export default App;
+export default Home;
