@@ -6,7 +6,7 @@ import React, {
   useContext,
 } from "react";
 import { Text, View, Button, SafeAreaView, Image } from "react-native";
-import { Audio } from "expo-av";
+import { createAudioPlayer, setAudioModeAsync } from "expo-audio";
 import styles from "./styles";
 import WaveForms from "../../components/Waveforms/Waveforms";
 import { getWaveForms } from "../../components/Waveforms/utils";
@@ -20,6 +20,7 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withTiming,
+  Easing,
   useAnimatedReaction,
   runOnJS,
 } from "react-native-reanimated";
@@ -29,7 +30,7 @@ import { useTheme } from "../../hooks/ThemeContext";
 import { STICK_FULL_WIDTH } from "../../components/Waveforms/constants";
 import { BARS_NUM } from "../../components/Waveforms/constants";
 
-const flaskServerURL = "http://192.168.0.177:5000";
+const flaskServerURL = "http://192.168.50.249:5000";
 
 const Player = ({ route }) => {
   const { paramId = 1, paramName = "" } = route.params || {};
@@ -53,6 +54,14 @@ const Player = ({ route }) => {
   }, [paramName, paramId]);
 
   useEffect(() => {
+    // iOS silences audio when the phone is in silent mode unless this is set
+    setAudioModeAsync({ playsInSilentMode: true }).catch((e) =>
+      console.error("Error setting audio mode:", e)
+    );
+  }, []);
+
+  useEffect(() => {
+    if (!id) return;
     fetchSound();
     fetchDuration();
     fetchWaveform();
@@ -61,7 +70,8 @@ const Player = ({ route }) => {
     resetWaveformAnimation();
     return () => {
       if (soundRef.current) {
-        soundRef.current.unloadAsync();
+        soundRef.current.remove();
+        soundRef.current = null;
       }
       clearInterval(intervalRef.current);
     };
@@ -90,12 +100,14 @@ const Player = ({ route }) => {
 
   useEffect(() => {
     if (soundLoaded && soundRef.current) {
-      const playbackStatusSubscription =
-        soundRef.current.setOnPlaybackStatusUpdate((status) => {
+      const playbackStatusSubscription = soundRef.current.addListener(
+        "playbackStatusUpdate",
+        (status) => {
           if (status.didJustFinish) {
             handlePlaybackEnd();
           }
-        });
+        }
+      );
       return () => {
         if (playbackStatusSubscription) {
           playbackStatusSubscription.remove();
@@ -133,7 +145,9 @@ const Player = ({ route }) => {
     try {
       const response = await fetch(`${flaskServerURL}/get_mp3/${id}`);
       if (soundRef.current) {
-        await soundRef.current.unloadAsync();
+        soundRef.current.remove();
+        soundRef.current = null;
+        setSoundLoaded(false);
       }
       await loadSound(response.url);
     } catch (error) {
@@ -161,9 +175,7 @@ const Player = ({ route }) => {
 
   const loadSound = async (uri) => {
     try {
-      const { sound: newSound, status } = await Audio.Sound.createAsync({
-        uri,
-      });
+      const newSound = createAudioPlayer({ uri });
       soundRef.current = newSound;
       setSoundLoaded(true);
     } catch (error) {
@@ -174,7 +186,7 @@ const Player = ({ route }) => {
   const playMP3 = async () => {
     if (soundLoaded) {
       try {
-        await soundRef.current.playAsync();
+        soundRef.current.play();
         setIsPlaying(true);
       } catch (error) {
         console.error("Error playing sound:", error);
@@ -185,7 +197,7 @@ const Player = ({ route }) => {
   const pauseMP3 = async () => {
     if (soundLoaded) {
       try {
-        await soundRef.current.pauseAsync();
+        soundRef.current.pause();
         setIsPlaying(false);
       } catch (error) {
         console.error("Error pausing sound:", error);
@@ -196,7 +208,8 @@ const Player = ({ route }) => {
   const stopMP3 = async () => {
     if (soundLoaded) {
       try {
-        await soundRef.current.stopAsync();
+        soundRef.current.pause();
+        await soundRef.current.seekTo(0);
         setIsPlaying(false);
         // Reset position when stopped
         setPosition(0);
@@ -210,15 +223,16 @@ const Player = ({ route }) => {
     async (bar) => {
       if (soundLoaded) {
         try {
-          await soundRef.current.playFromPositionAsync(
-            (bar / BARS_NUM) * duration * 1000
-          );
+          const total =
+            soundRef.current.duration > 0 ? soundRef.current.duration : duration;
+          await soundRef.current.seekTo((bar / BARS_NUM) * total);
+          soundRef.current.play();
         } catch (error) {
           console.error("Error seeking sound:", error);
         }
       }
     },
-    [soundLoaded, soundRef.current]
+    [soundLoaded, soundRef.current, duration]
   );
 
   const playing = useSharedValue(false);
@@ -232,29 +246,28 @@ const Player = ({ route }) => {
   const offsetX = useSharedValue(0);
   const segmentIndex = useSharedValue(0);
 
+  // Drive the waveform from the real playback position instead of a free-running timer
   useEffect(() => {
     const interval = setInterval(() => {
-      updateProgress();
-    }, BARS_NUM / duration);
+      const player = soundRef.current;
+      if (!player || sliding.value) return;
+      const total = player.duration > 0 ? player.duration : duration;
+      const fraction = Math.min(Math.max(player.currentTime / total, 0), 1);
+      const target = -fraction * BARS_NUM * STICK_FULL_WIDTH;
+      panX.value = withTiming(target, {
+        duration: 250,
+        easing: Easing.linear,
+      });
+      setPosition(Math.floor(player.currentTime));
+    }, 250);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [duration]);
 
-  const updateProgress = () => {
-    "worklet";
-    setPosition(
-      Math.floor(
-        (Math.round(-panX.value / STICK_FULL_WIDTH) / BARS_NUM) * duration
-      )
-    );
-
-    // console.log((Math.round(-panX.value / STICK_FULL_WIDTH) / BARS_NUM) * duration );
-    //  console.log(duration);
-    if (playing.value && panX.value > maxPanX) {
-      panX.value = withTiming(panX.value - STICK_FULL_WIDTH);
-    }
-  };
   const panGesture = Gesture.Pan()
+    .onBegin(() => {
+      offsetX.value = panX.value;
+    })
     .onUpdate((event) => {
       sliding.value = true;
       const nextPanX = offsetX.value + event.translationX;

@@ -33,3 +33,7 @@ yarn-error.*
 
 # typescript
 *.tsbuildinfo
+
+# local music files and python cache
+server/songs/*.mp3
+server/__pycache__/

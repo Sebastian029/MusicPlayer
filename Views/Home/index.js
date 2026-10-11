@@ -9,7 +9,6 @@ import {
   TouchableOpacity,
   TextInput,
 } from "react-native";
-import { Audio } from "expo-av";
 import styles from "./styles";
 import WaveForms from "../../components/Waveforms/Waveforms";
 import { getWaveForms } from "../../components/Waveforms/utils";
@@ -28,7 +27,7 @@ import Animated, {
 import { STICK_FULL_WIDTH } from "../../components/Waveforms/constants";
 import { useTheme } from "../../hooks/ThemeContext";
 
-const flaskServerURL = "http://192.168.0.177:5000";
+const flaskServerURL = "http://192.168.50.249:5000";
 
 const App = ({ navigation }) => {
   const { theme } = useTheme();
