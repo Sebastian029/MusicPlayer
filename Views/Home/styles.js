@@ -1,5 +1,4 @@
 import { StyleSheet } from "react-native";
-import { SearchBar } from "react-native-screens";
 
 const styles = StyleSheet.create({
   container: {

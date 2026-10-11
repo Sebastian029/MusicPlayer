@@ -1,7 +1,7 @@
 import * as React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Text, StyleSheet } from "react-native";
-import Blur, { BlurView } from "expo-blur";
+import { BlurView } from "expo-blur";
 import { useTheme } from "../hooks/ThemeContext";
 
 import TabIcon from "../components/TabIcon";
