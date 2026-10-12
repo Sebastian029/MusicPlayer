@@ -36,5 +36,6 @@ yarn-error.*
 
 # local music library and python cache
 server/songs/
+server/my_playlists.json
 server/__pycache__/
 .idea/
