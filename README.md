@@ -141,6 +141,8 @@ server/test_server.py     pytest tests (temporary songs folder, real library unt
 
 Uploading songs from the app, authentication with a token, drag-and-drop reordering, a Docker image for the server.
 
+## License
 
+Released under the [MIT License](LICENSE).
 
 Music is not part of this repository. The screenshots show a private collection.
