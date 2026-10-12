@@ -5,6 +5,7 @@ import {
   useAudioPlayerStatus,
 } from "expo-audio";
 import { API_URL } from "../config";
+import { clearWaveFormsCache } from "../components/Waveforms/utils";
 
 const PlayerContext = createContext();
 const PositionContext = createContext();
@@ -12,6 +13,7 @@ const PositionContext = createContext();
 export const PlayerProvider = ({ children }) => {
   const [songs, setSongs] = useState([]);
   const [playlists, setPlaylists] = useState([]);
+  const [myPlaylists, setMyPlaylists] = useState([]);
   const [queue, setQueue] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -27,7 +29,9 @@ export const PlayerProvider = ({ children }) => {
       playsInSilentMode: true,
       shouldPlayInBackground: true,
       interruptionMode: "doNotMix",
-    }).catch((error) => console.error("Error setting audio mode:", error));
+    }).catch((audioError) =>
+      console.error("Error setting audio mode:", audioError)
+    );
     loadSongs();
   }, []);
 
@@ -40,19 +44,57 @@ export const PlayerProvider = ({ children }) => {
   const loadSongs = async () => {
     setLoading(true);
     setError(null);
+    clearWaveFormsCache();
     try {
       const songsResponse = await fetch(`${API_URL}/media_files`);
       const playlistsResponse = await fetch(`${API_URL}/playlists`);
-      if (!songsResponse.ok || !playlistsResponse.ok) {
-        throw new Error("Serwer zwrócił błąd");
+      const myPlaylistsResponse = await fetch(`${API_URL}/my_playlists`);
+      if (
+        !songsResponse.ok ||
+        !playlistsResponse.ok ||
+        !myPlaylistsResponse.ok
+      ) {
+        throw new Error("Server returned an error");
       }
       setSongs(await songsResponse.json());
       setPlaylists(await playlistsResponse.json());
-    } catch (error) {
-      setError(error.message);
+      setMyPlaylists(await myPlaylistsResponse.json());
+    } catch (fetchError) {
+      setError(fetchError.message);
     }
     setLoading(false);
   };
+
+  const changeMyPlaylists = async (path, method, body) => {
+    try {
+      const response = await fetch(`${API_URL}${path}`, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!response.ok) {
+        throw new Error("Server returned an error");
+      }
+      const result = response.status === 204 ? null : await response.json();
+      await loadSongs();
+      return result;
+    } catch (changeError) {
+      setError(changeError.message);
+      return null;
+    }
+  };
+
+  const createPlaylist = (name) =>
+    changeMyPlaylists("/my_playlists", "POST", { name });
+
+  const savePlaylist = (playlist) =>
+    changeMyPlaylists(`/my_playlists/${playlist.id}`, "PUT", {
+      name: playlist.name,
+      song_ids: playlist.song_ids,
+    });
+
+  const deletePlaylist = (playlistId) =>
+    changeMyPlaylists(`/my_playlists/${playlistId}`, "DELETE");
 
   const playSong = (song, songQueue) => {
     if (songQueue) {
@@ -124,6 +166,10 @@ export const PlayerProvider = ({ children }) => {
       value={{
         songs,
         playlists,
+        myPlaylists,
+        createPlaylist,
+        savePlaylist,
+        deletePlaylist,
         loading,
         error,
         loadSongs,

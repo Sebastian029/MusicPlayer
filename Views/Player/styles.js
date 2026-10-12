@@ -17,16 +17,20 @@ const styles = StyleSheet.create({
     fontFamily: "Helvetica",
     fontWeight: "bold",
     letterSpacing: 1,
-    textAlign: "center",
   },
   textBlock: {
     alignSelf: "stretch",
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: 24,
+    gap: 12,
+  },
+  textColumn: {
+    flex: 1,
     gap: 4,
   },
   artist: {
     fontSize: 16,
-    textAlign: "center",
   },
   playedPart: {
     position: "absolute",
@@ -68,10 +72,6 @@ const styles = StyleSheet.create({
   },
   icon: {
     fontSize: 30,
-  },
-  favoriteContainer: {
-    alignItems: "center",
-    marginTop: 10,
   },
   empty: {
     flex: 1,

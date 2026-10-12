@@ -4,7 +4,6 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { API_URL } from "../../config";
 import { useTheme } from "../../hooks/ThemeContext";
 import { usePlayer } from "../../hooks/PlayerContext";
-import { darkTheme } from "../../themes";
 import styles from "./styles";
 
 const Row = ({ label, value, theme }) => (
@@ -30,7 +29,7 @@ const Profile = () => {
             Dark theme
           </Text>
           <Switch
-            value={theme === darkTheme}
+            value={theme.dark}
             onValueChange={toggleTheme}
             trackColor={{ false: theme.track, true: theme.accent }}
             thumbColor={theme.dark ? theme.text : theme.background}

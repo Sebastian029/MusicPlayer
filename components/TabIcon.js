@@ -1,7 +1,6 @@
 import React from "react";
 import { StyleSheet } from "react-native";
-import { AntDesign } from "@expo/vector-icons";
-import { FontAwesome } from "@expo/vector-icons";
+import { AntDesign, FontAwesome, Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../hooks/ThemeContext";
 
 const TabIcon = ({ routeName, focused }) => {
@@ -11,6 +10,11 @@ const TabIcon = ({ routeName, focused }) => {
     case "Home":
       return (
         <AntDesign name="home" style={[styles.icon, { color: iconColor }]} />
+      );
+
+    case "Playlists":
+      return (
+        <Ionicons name="albums" style={[styles.icon, { color: iconColor }]} />
       );
 
     case "Player":

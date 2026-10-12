@@ -25,30 +25,26 @@ const styles = StyleSheet.create({
   },
   searchBox: {
     flex: 1,
+    borderWidth: 1.5,
   },
   filterIcon: {
     fontSize: 28,
     marginLeft: 10,
     marginBottom: 10,
   },
-  chips: {
-    flexGrow: 0,
-    marginBottom: 10,
-  },
-  chip: {
+  selectedRow: {
     flexDirection: "row",
     alignItems: "center",
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    marginRight: 8,
+    marginBottom: 10,
   },
-  chipImage: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    marginRight: 8,
+  selectedName: {
+    flex: 1,
+    fontSize: 18,
+    fontWeight: "bold",
+  },
+  selectedIcon: {
+    fontSize: 26,
+    paddingLeft: 12,
   },
   heart: {
     fontSize: 24,
@@ -70,6 +66,9 @@ const styles = StyleSheet.create({
   },
   artist: {
     fontSize: 12,
+  },
+  listContent: {
+    paddingBottom: 76,
   },
   textContainer: {
     flex: 1,

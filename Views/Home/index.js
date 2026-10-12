@@ -15,22 +15,42 @@ import { API_URL } from "../../config";
 import { useTheme } from "../../hooks/ThemeContext";
 import { usePlayer } from "../../hooks/PlayerContext";
 import { useFavorites } from "../../hooks/FavoritesContext";
+import AddToPlaylistModal from "../../components/AddToPlaylistModal";
+import PlaylistEditor from "../../components/PlaylistEditor";
 
-const Home = ({ navigation }) => {
+const Home = ({ navigation, route }) => {
   const { theme } = useTheme();
-  const { songs, playlists, loading, error, loadSongs, playSong, current } =
+  const { songs, myPlaylists, loading, error, loadSongs, playSong, current } =
     usePlayer();
   const { isFavorite, toggleFavorite } = useFavorites();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [onlyFavorites, setOnlyFavorites] = useState(false);
-  const [selectedPlaylist, setSelectedPlaylist] = useState(null);
+  const [songToAdd, setSongToAdd] = useState(null);
+  const [editing, setEditing] = useState(false);
 
-  const chips = [{ name: null }, ...playlists];
+  const folder = route.params?.folder;
+  const myPlaylist = myPlaylists.find(
+    (playlist) => playlist.id === route.params?.myPlaylistId
+  );
+  const selectedName = myPlaylist ? myPlaylist.name : folder;
 
-  const playlistSongs = selectedPlaylist
-    ? songs.filter((song) => song.playlist === selectedPlaylist)
-    : songs;
+  const getPlaylistSongs = () => {
+    if (myPlaylist) {
+      return myPlaylist.song_ids
+        .map((songId) => songs.find((song) => song.id === songId))
+        .filter((song) => song);
+    }
+    if (folder) {
+      return songs.filter((song) => song.playlist === folder);
+    }
+    return songs;
+  };
+  const playlistSongs = getPlaylistSongs();
+
+  const showAllSongs = () => {
+    navigation.setParams({ folder: undefined, myPlaylistId: undefined });
+  };
 
   const query = searchQuery.toLowerCase();
   const visibleSongs = playlistSongs.filter((song) => {
@@ -54,11 +74,11 @@ const Home = ({ navigation }) => {
       return (
         <View style={styles.centered}>
           <Text style={[styles.errorText, { color: theme.danger }]}>
-            Nie można połączyć z serwerem: {error}
+            Cannot connect to the server: {error}
           </Text>
           <TouchableOpacity onPress={loadSongs}>
             <Text style={[styles.retry, { color: theme.text }]}>
-              Spróbuj ponownie
+              Try again
             </Text>
           </TouchableOpacity>
         </View>
@@ -66,40 +86,15 @@ const Home = ({ navigation }) => {
     }
     return (
       <Text style={[styles.emptyText, { color: theme.muted }]}>
-        {onlyFavorites ? "Brak ulubionych utworów" : "Brak utworów"}
+        {onlyFavorites ? "No favorite songs" : "No songs"}
       </Text>
-    );
-  };
-
-  const renderChip = ({ item: chip }) => {
-    const selected = chip.name === selectedPlaylist;
-    return (
-      <TouchableOpacity
-        onPress={() => setSelectedPlaylist(chip.name)}
-        style={[
-          styles.chip,
-          {
-            borderColor: selected ? theme.text : theme.track,
-            backgroundColor: selected ? theme.text : theme.surface,
-          },
-        ]}
-      >
-        {chip.image && (
-          <Image
-            source={{ uri: `${API_URL}/${chip.image}` }}
-            style={styles.chipImage}
-          />
-        )}
-        <Text style={{ color: selected ? theme.background : theme.text }}>
-          {chip.name || "Wszystkie"}
-        </Text>
-      </TouchableOpacity>
     );
   };
 
   const renderSong = ({ item: song }) => (
     <TouchableOpacity
       onPress={() => openSong(song)}
+      onLongPress={() => setSongToAdd(song)}
       style={styles.itemContainer}
     >
       {song.image && (
@@ -140,7 +135,7 @@ const Home = ({ navigation }) => {
             style={[
               styles.searchBar,
               styles.searchBox,
-              { borderWidth: 1.5, borderColor: theme.track },
+              { borderColor: theme.track },
             ]}
           >
             <TextInput
@@ -157,14 +152,28 @@ const Home = ({ navigation }) => {
             onPress={() => setOnlyFavorites(!onlyFavorites)}
           />
         </View>
-        <FlatList
-          horizontal
-          data={chips}
-          keyExtractor={(chip) => String(chip.name)}
-          renderItem={renderChip}
-          showsHorizontalScrollIndicator={false}
-          style={styles.chips}
-        />
+        {selectedName && (
+          <View style={styles.selectedRow}>
+            <Text
+              numberOfLines={1}
+              style={[styles.selectedName, { color: theme.text }]}
+            >
+              {selectedName}
+            </Text>
+            {myPlaylist && (
+              <Ionicons
+                name="create-outline"
+                style={[styles.selectedIcon, { color: theme.text }]}
+                onPress={() => setEditing(true)}
+              />
+            )}
+            <Ionicons
+              name="close"
+              style={[styles.selectedIcon, { color: theme.muted }]}
+              onPress={showAllSongs}
+            />
+          </View>
+        )}
         <FlatList
           data={visibleSongs}
           keyExtractor={(song) => String(song.id)}
@@ -172,9 +181,16 @@ const Home = ({ navigation }) => {
           refreshing={loading}
           onRefresh={loadSongs}
           ListEmptyComponent={renderEmpty}
-          contentContainerStyle={{ paddingBottom: 76 }}
+          contentContainerStyle={styles.listContent}
         />
       </View>
+      <AddToPlaylistModal song={songToAdd} onClose={() => setSongToAdd(null)} />
+      {editing && myPlaylist && (
+        <PlaylistEditor
+          playlist={myPlaylist}
+          onClose={() => setEditing(false)}
+        />
+      )}
     </SafeAreaView>
   );
 };

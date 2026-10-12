@@ -23,6 +23,13 @@ import { API_URL } from "../../config";
 import { useTheme } from "../../hooks/ThemeContext";
 import { usePlayer, usePosition } from "../../hooks/PlayerContext";
 import { useFavorites } from "../../hooks/FavoritesContext";
+import AddToPlaylistModal from "../../components/AddToPlaylistModal";
+
+const TOP_WAVE_HEIGHT_PLAYING = 50;
+const TOP_WAVE_HEIGHT_PAUSED = 5;
+const BOTTOM_WAVE_HEIGHT_PLAYING = 40;
+const BOTTOM_WAVE_HEIGHT_PAUSED = 4;
+const POSITION_UPDATE_MS = 250;
 
 const formatTime = (seconds) => {
   const minutes = Math.floor(seconds / 60);
@@ -48,6 +55,7 @@ const Player = () => {
   const { isFavorite, toggleFavorite } = useFavorites();
 
   const [wave, setWave] = useState(null);
+  const [addingToPlaylist, setAddingToPlaylist] = useState(false);
   const waveWidth = wave ? wave.bars.length * STICK_FULL_WIDTH : 0;
   const songDuration = wave && wave.duration > 0 ? wave.duration : duration;
 
@@ -91,7 +99,7 @@ const Player = () => {
     }
     const played = Math.min(position / songDuration, 1);
     panX.value = withTiming(-played * waveWidth, {
-      duration: 250,
+      duration: POSITION_UPDATE_MS,
       easing: Easing.linear,
     });
   }, [position, songDuration, waveWidth]);
@@ -127,11 +135,15 @@ const Player = () => {
   }));
 
   const topWavesAnimatedStyle = useAnimatedStyle(() => ({
-    height: withTiming(playing.value ? 50 : 5),
+    height: withTiming(
+      playing.value ? TOP_WAVE_HEIGHT_PLAYING : TOP_WAVE_HEIGHT_PAUSED
+    ),
   }));
 
   const bottomWavesAnimatedStyle = useAnimatedStyle(() => ({
-    height: withTiming(playing.value ? 40 : 4),
+    height: withTiming(
+      playing.value ? BOTTOM_WAVE_HEIGHT_PLAYING : BOTTOM_WAVE_HEIGHT_PAUSED
+    ),
   }));
 
   if (!current) {
@@ -141,7 +153,7 @@ const Player = () => {
         style={[styles.empty, { backgroundColor: theme.background }]}
       >
         <Text style={[styles.topText, { color: theme.text }]}>
-          Wybierz utwór z listy Home
+          Pick a song from the Home list
         </Text>
       </SafeAreaView>
     );
@@ -162,15 +174,30 @@ const Player = () => {
           </View>
         )}
         <View style={styles.textBlock}>
-          <Text
-            numberOfLines={2}
-            style={[styles.songTitle, { color: theme.text }]}
-          >
-            {current.name}
-          </Text>
-          <Text numberOfLines={1} style={[styles.artist, { color: theme.muted }]}>
-            {current.artist}
-          </Text>
+          <View style={styles.textColumn}>
+            <Text
+              numberOfLines={2}
+              style={[styles.songTitle, { color: theme.text }]}
+            >
+              {current.name}
+            </Text>
+            <Text
+              numberOfLines={1}
+              style={[styles.artist, { color: theme.muted }]}
+            >
+              {current.artist}
+            </Text>
+          </View>
+          <Ionicons
+            name="add-circle-outline"
+            style={[styles.icon, { color: theme.text }]}
+            onPress={() => setAddingToPlaylist(true)}
+          />
+          <Ionicons
+            name={isFavorite(current) ? "heart" : "heart-outline"}
+            style={[styles.icon, { color: theme.text }]}
+            onPress={() => toggleFavorite(current)}
+          />
         </View>
       </View>
 
@@ -246,13 +273,10 @@ const Player = () => {
         />
       </View>
 
-      <View style={styles.favoriteContainer}>
-        <Ionicons
-          name={isFavorite(current) ? "heart" : "heart-outline"}
-          style={[styles.icon, { color: theme.text }]}
-          onPress={() => toggleFavorite(current)}
-        />
-      </View>
+      <AddToPlaylistModal
+        song={addingToPlaylist ? current : null}
+        onClose={() => setAddingToPlaylist(false)}
+      />
     </SafeAreaView>
   );
 };
